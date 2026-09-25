@@ -3,11 +3,14 @@ import { getAccessToken, refreshAccessToken } from './auth';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://teetimenexus.com';
 
 async function doFetch(path: string, options: RequestInit | undefined, accessToken: string | null) {
+  // Let fetch set its own multipart boundary header when sending FormData.
+  const isFormData = typeof FormData !== 'undefined' && options?.body instanceof FormData;
+
   return fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options?.headers,
     },
