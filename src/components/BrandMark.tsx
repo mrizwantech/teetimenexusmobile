@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors } from '../theme';
+import { brandMarkStyles as styles } from '../theme';
 
 export function BrandMark() {
   return (
@@ -10,19 +10,3 @@ export function BrandMark() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { gap: 1 },
-  top: {
-    color: colors.heading,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2.2,
-  },
-  bottom: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 2.4,
-  },
-});

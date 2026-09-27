@@ -26,6 +26,18 @@ async function parseErrorMessage(response: Response): Promise<string> {
     return 'Something went wrong. Please try again.';
 }
 
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+    const text = await response.text();
+    if (!text.trim()) {
+        throw new Error('The server returned an empty response. Please try again.');
+    }
+    try {
+        return JSON.parse(text) as T;
+    } catch {
+        throw new Error('The server returned an invalid response. Please try again.');
+    }
+}
+
 export async function login(username: string, password: string): Promise<LoginResponse> {
     const response = await fetch(`${API_BASE_URL}/wp-json/ttn/v1/auth/login`, {
         method: 'POST',
@@ -37,7 +49,7 @@ export async function login(username: string, password: string): Promise<LoginRe
         throw new Error(await parseErrorMessage(response));
     }
 
-    const data = (await response.json()) as LoginResponse;
+    const data = await parseJsonResponse<LoginResponse>(response);
     await storeTokens(data);
     return data;
 }
@@ -71,7 +83,7 @@ async function performRefresh(): Promise<TokenPair | null> {
         return null;
     }
 
-    const data = (await response.json()) as TokenPair;
+    const data = await parseJsonResponse<TokenPair>(response);
     await storeTokens(data);
     return data;
 }
@@ -122,7 +134,7 @@ export async function fetchCurrentUser(accessToken: string): Promise<AuthUser | 
     });
 
     if (!response.ok) return null;
-    return (await response.json()) as AuthUser;
+    return parseJsonResponse<AuthUser>(response);
 }
 
 export { clearTokens };

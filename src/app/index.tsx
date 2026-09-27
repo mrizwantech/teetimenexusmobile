@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ImageBackground, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ImageBackground, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Link } from 'expo-router';
 
 import { BrandMark } from '../components/BrandMark';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
-import { colors, spacing } from '../theme';
+import { colors, homeStyles as styles, spacing } from '../theme';
 
 const slides = [
   {
@@ -230,37 +230,3 @@ function StayTunedModal({ visible, onClose }: { visible: boolean; onClose: () =>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  carousel: { backgroundColor: colors.surfaceStrong, borderRadius: 24, height: 440, overflow: 'hidden' },
-  slide: { height: 440, justifyContent: 'flex-end', padding: spacing.md },
-  slideImage: { borderRadius: 24 },
-  copyPanel: { backgroundColor: 'rgba(6, 10, 10, 0.78)', borderColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 18, borderWidth: 1, gap: spacing.md, padding: spacing.lg },
-  kicker: { color: colors.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
-  title: { color: colors.heading, fontSize: 30, fontWeight: '900', lineHeight: 34 },
-  body: { color: colors.muted, fontSize: 15, lineHeight: 23 },
-  live: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  heading: { paddingTop: spacing.sm },
-  sectionTitle: { color: colors.heading, fontSize: 24, fontWeight: '800' },
-  cardTitle: { color: colors.heading, fontSize: 20, fontWeight: '800', marginVertical: 8 },
-  arrow: { alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.16)', borderColor: 'rgba(255, 255, 255, 0.28)', borderRadius: 22, borderWidth: 1, height: 44, justifyContent: 'center', position: 'absolute', top: 198, width: 44 },
-  previousArrow: { left: spacing.sm },
-  nextArrow: { right: spacing.sm },
-  arrowText: { color: colors.heading, fontSize: 32, fontWeight: '300', lineHeight: 34 },
-  dots: { bottom: spacing.md, flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', left: 0, position: 'absolute', right: 0 },
-  dot: { backgroundColor: 'rgba(255, 255, 255, 0.55)', borderRadius: 5, height: 10, width: 10 },
-  activeDot: { backgroundColor: colors.primary },
-  modalBackdrop: { backgroundColor: 'rgba(0, 0, 0, 0.72)', flex: 1, justifyContent: 'flex-end' },
-  modalScrollContent: { flexGrow: 1, justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: colors.bg, borderColor: colors.borderStrong, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.xl },
-  closeButton: { alignItems: 'center', alignSelf: 'flex-end', height: 36, justifyContent: 'center', width: 36 },
-  closeText: { color: colors.muted, fontSize: 30, fontWeight: '300' },
-  modalTitle: { color: colors.heading, fontSize: 34, fontWeight: '900', textAlign: 'center' },
-  modalSubtitle: { color: colors.muted, fontSize: 16, textAlign: 'center' },
-  modalBody: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  field: { gap: spacing.xs },
-  fieldLabel: { color: colors.heading, fontSize: 14, fontWeight: '800' },
-  modalInput: { backgroundColor: colors.surfaceSoft, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.text, fontSize: 15, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
-  privacyNote: { color: colors.subtle, fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  error: { color: colors.danger, fontSize: 14 },
-});

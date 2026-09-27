@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 
-import { colors, spacing } from '../theme';
+import { bottomNavStyles as styles } from '../theme';
 
 const items = [
   { label: 'Home', path: '/' },
@@ -28,19 +28,3 @@ export function BottomNav() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  nav: {
-    backgroundColor: colors.surfaceStrong,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingBottom: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  item: { alignItems: 'center', gap: 4, minWidth: 72, paddingVertical: 4 },
-  label: { color: colors.subtle, fontSize: 11, fontWeight: '700' },
-  active: { color: colors.primary },
-  dot: { backgroundColor: colors.primary, borderRadius: 3, height: 4, width: 4 },
-});

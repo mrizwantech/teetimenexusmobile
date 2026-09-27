@@ -1,23 +1,26 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
-import * as WebBrowser from 'expo-web-browser';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Bay, getAvailability, getBays, getTimeSlots, TimeSlot } from '../api/booking';
 import { startCheckout } from '../api/checkout';
-import { getVerificationStatus } from '../api/verification';
+import { getVerificationStatus, submitVerification } from '../api/verification';
 import { BrandMark } from '../components/BrandMark';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
+import { SignaturePad, SignaturePadHandle } from '../components/SignaturePad';
 import { useAuth } from '../context/AuthContext';
-import { colors, spacing } from '../theme';
+import { bookingStyles as styles } from '../theme';
 
 type BayType = 'right-handed' | 'left-handed';
 
 function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function isBayVisibleForType(bay: Bay, bayType: BayType): boolean {
@@ -26,6 +29,7 @@ function isBayVisibleForType(bay: Bay, bayType: BayType): boolean {
 
 export default function BookScreen() {
   const { user } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
   const [bays, setBays] = useState<Bay[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loadError, setLoadError] = useState('');
@@ -34,12 +38,35 @@ export default function BookScreen() {
   const [bayType, setBayType] = useState<BayType | null>(null);
   const [bayKey, setBayKey] = useState<string | null>(null);
   const [date, setDate] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [duration, setDuration] = useState<number | null>(null);
   const [players, setPlayers] = useState<number | null>(null);
   const [time, setTime] = useState<string | null>(null);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
+
+  const signatureRef = useRef<SignaturePadHandle>(null);
+  const [alreadyVerified, setAlreadyVerified] = useState(false);
+  const [idImage, setIdImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [hasSignature, setHasSignature] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    getVerificationStatus()
+      .then((result) => {
+        if (!cancelled) setAlreadyVerified(result.verified);
+      })
+      .catch(() => {
+        if (!cancelled) setAlreadyVerified(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     (async () => {
@@ -129,7 +156,34 @@ export default function BookScreen() {
   }
 
   const totalPrice = selectedBay && duration ? selectedBay.hourly_price * duration : 0;
-  const readyToContinue = Boolean(selectedBay && date && duration && players && time);
+  const selectionsComplete = Boolean(selectedBay && date && duration && players && time);
+  const verificationComplete = alreadyVerified || Boolean(idImage && hasSignature && termsAccepted);
+  const readyToContinue = selectionsComplete && verificationComplete;
+
+  function scrollToLatestStep() {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+  }
+
+  function selectDate(nextDate: Date) {
+    setDate(nextDate);
+    setDuration(null);
+    setPlayers(null);
+    setTime(null);
+    scrollToLatestStep();
+  }
+
+  async function pickIdDocument() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Photo library access is required to upload your ID.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (!result.canceled && result.assets[0]) {
+      setIdImage(result.assets[0]);
+    }
+  }
 
   function handleBayTypeSelect(nextType: BayType) {
     setBayType(nextType);
@@ -154,28 +208,30 @@ export default function BookScreen() {
 
     setContinuing(true);
     try {
-      const { verified } = await getVerificationStatus();
-      const bookingParams = {
-        bay: selectedBay.name,
-        date: formatDate(date),
-        time,
-        duration: String(duration),
-        players: String(players),
-      };
+      if (!alreadyVerified) {
+        if (!idImage || !signatureRef.current?.hasSignature()) {
+          Alert.alert('Verification incomplete', 'Please upload your ID and sign before continuing.');
+          return;
+        }
 
-      if (!verified) {
-        router.push({ pathname: '/verify', params: bookingParams });
-        return;
+        const signatureDataUrl = await signatureRef.current.capture();
+        await submitVerification({
+          idDocumentUri: idImage.uri,
+          idDocumentName: idImage.fileName ?? 'id-document.jpg',
+          idDocumentType: idImage.mimeType ?? 'image/jpeg',
+          signatureDataUrl,
+        });
+        setAlreadyVerified(true);
       }
 
       const { bridge_url } = await startCheckout({
-        bay: bookingParams.bay,
-        date: bookingParams.date,
-        time: bookingParams.time,
+        bay: selectedBay.name,
+        date: formatDate(date),
+        time,
         duration,
         players,
       });
-      await WebBrowser.openBrowserAsync(bridge_url);
+      router.push({ pathname: '/checkout', params: { url: bridge_url } });
     } catch (err) {
       Alert.alert('Unable to continue', err instanceof Error ? err.message : 'Please try again.');
     } finally {
@@ -184,7 +240,7 @@ export default function BookScreen() {
   }
 
   return (
-    <Screen>
+    <Screen scrollRef={scrollRef}>
       <ScreenHeader>
         <BrandMark />
         <Text style={styles.step}>RESERVE A BAY</Text>
@@ -226,25 +282,7 @@ export default function BookScreen() {
         {selectedBay ? (
           <>
             <Text style={styles.label}>Date</Text>
-            <Pressable style={styles.dateInput} onPress={() => setShowDatePicker(true)}>
-              <Text style={date ? styles.dateInputText : styles.dateInputPlaceholder}>{date ? formatDate(date) : 'Select a date'}</Text>
-            </Pressable>
-            {showDatePicker ? (
-              <DateTimePicker
-                value={date ?? new Date()}
-                mode="date"
-                minimumDate={new Date()}
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                onChange={(_event, selectedDate) => {
-                  setShowDatePicker(Platform.OS === 'ios');
-                  if (selectedDate) {
-                    setDate(selectedDate);
-                    setDuration(null);
-                    setTime(null);
-                  }
-                }}
-              />
-            ) : null}
+            <InlineCalendar month={calendarMonth} selectedDate={date} onMonthChange={setCalendarMonth} onSelectDate={selectDate} />
           </>
         ) : null}
 
@@ -263,6 +301,7 @@ export default function BookScreen() {
                     onPress={() => {
                       setDuration(hours);
                       setTime(null);
+                      scrollToLatestStep();
                     }}
                   />
                 );
@@ -276,7 +315,15 @@ export default function BookScreen() {
             <Text style={styles.label}>Players</Text>
             <View style={styles.optionsWrap}>
               {[1, 2, 3, 4].map((count) => (
-                <Pill key={count} label={String(count)} selected={players === count} onPress={() => setPlayers(count)} />
+                <Pill
+                  key={count}
+                  label={String(count)}
+                  selected={players === count}
+                  onPress={() => {
+                    setPlayers(count);
+                    scrollToLatestStep();
+                  }}
+                />
               ))}
             </View>
           </>
@@ -292,24 +339,135 @@ export default function BookScreen() {
                   label={slot.label}
                   selected={time === slot.label}
                   disabled={!isTimeSlotAvailable(index)}
-                  onPress={() => setTime(slot.label)}
+                  onPress={() => {
+                    setTime(slot.label);
+                    scrollToLatestStep();
+                  }}
                 />
               ))}
             </View>
           </>
         ) : null}
 
-        {readyToContinue ? (
-          <Text style={styles.summary}>
-            {selectedBay?.name} • {date && formatDate(date)} • {time} ({duration}h) • {players} {players === 1 ? 'player' : 'players'}
-            {'\n'}
-            <Text style={styles.summaryTotal}>Total: ${totalPrice}</Text>
-          </Text>
+        {selectionsComplete ? (
+          <>
+            <Text style={styles.summary}>
+              {selectedBay?.name} • {date && formatDate(date)} • {time} ({duration}h) • {players} {players === 1 ? 'player' : 'players'}
+              {'\n'}
+              <Text style={styles.summaryTotal}>Total: ${totalPrice}</Text>
+            </Text>
+
+            <Text style={styles.sectionHeading}>Verify your reservation</Text>
+            {alreadyVerified ? (
+              <Text style={styles.verifiedNote}>✓ Using the ID, signature, and terms already on file for your account.</Text>
+            ) : (
+              <>
+                <Text style={styles.label}>Upload a photo of your government-issued ID</Text>
+                {idImage ? <Image source={{ uri: idImage.uri }} style={styles.idPreview} resizeMode="cover" /> : null}
+                <Pressable style={styles.uploadButton} onPress={pickIdDocument}>
+                  <Text style={styles.uploadButtonText}>{idImage ? 'Change photo' : 'Choose photo'}</Text>
+                </Pressable>
+                <Text style={styles.hint}>JPG or PNG, up to 8MB. Stored encrypted and only viewable by our staff.</Text>
+
+                <Text style={[styles.label, styles.labelSpacer]}>Sign to confirm your reservation</Text>
+                <SignaturePad ref={signatureRef} onChange={setHasSignature} />
+                <Pressable
+                  style={styles.clearButton}
+                  onPress={() => {
+                    signatureRef.current?.clear();
+                    setHasSignature(false);
+                  }}
+                >
+                  <Text style={styles.clearButtonText}>Clear signature</Text>
+                </Pressable>
+
+                <Pressable style={styles.termsRow} onPress={() => setTermsAccepted((prev) => !prev)}>
+                  <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+                    {termsAccepted ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                  </View>
+                  <Text style={styles.termsText}>I have read and agree to the Terms and Conditions.</Text>
+                </Pressable>
+              </>
+            )}
+          </>
         ) : null}
 
-        <PrimaryButton label={continuing ? 'Please wait…' : 'Continue to payment'} onPress={handleContinue} />
+        <PrimaryButton
+          label={continuing ? 'Please wait…' : 'Continue to payment'}
+          onPress={handleContinue}
+          disabled={!readyToContinue || continuing}
+        />
       </SectionCard>
     </Screen>
+  );
+}
+
+function InlineCalendar({
+  month,
+  selectedDate,
+  onMonthChange,
+  onSelectDate,
+}: {
+  month: Date;
+  selectedDate: Date | null;
+  onMonthChange: (month: Date) => void;
+  onSelectDate: (date: Date) => void;
+}) {
+  const today = new Date();
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const leadingDays = (firstDay.getDay() + 6) % 7;
+  const days = Array.from({ length: leadingDays + daysInMonth }, (_, index) => {
+    if (index < leadingDays) return null;
+    return new Date(month.getFullYear(), month.getMonth(), index - leadingDays + 1);
+  });
+  const canGoPrevious = month.getFullYear() > today.getFullYear() || month.getMonth() > today.getMonth();
+
+  return (
+    <View style={styles.calendar}>
+      <View style={styles.calendarHeader}>
+        <Pressable
+          accessibilityLabel="Previous month"
+          accessibilityRole="button"
+          disabled={!canGoPrevious}
+          onPress={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+          style={[styles.monthButton, !canGoPrevious && styles.monthButtonDisabled]}
+        >
+          <Text style={styles.monthButtonText}>‹</Text>
+        </Pressable>
+        <Text style={styles.monthTitle}>{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
+        <Pressable
+          accessibilityLabel="Next month"
+          accessibilityRole="button"
+          onPress={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+          style={styles.monthButton}
+        >
+          <Text style={styles.monthButtonText}>›</Text>
+        </Pressable>
+      </View>
+      <View style={styles.weekRow}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => <Text key={`${day}-${index}`} style={styles.weekDay}>{day}</Text>)}
+      </View>
+      <View style={styles.calendarGrid}>
+        {days.map((day, index) => {
+          if (!day) return <View key={`empty-${index}`} style={styles.dayCell} />;
+          const isPast = formatDate(day) < formatDate(today);
+          const isSelected = selectedDate && formatDate(selectedDate) === formatDate(day);
+          return (
+            <Pressable
+              key={formatDate(day)}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isPast, selected: Boolean(isSelected) }}
+              disabled={isPast}
+              onPress={() => onSelectDate(day)}
+              style={[styles.dayCell, isSelected && styles.selectedDay, isPast && styles.pastDay]}
+            >
+              <Text style={[styles.dayText, isSelected && styles.selectedDayText, isPast && styles.pastDayText]}>{day.getDate()}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -326,32 +484,3 @@ function Pill({ label, selected, disabled, onPress }: { label: string; selected:
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  step: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  title: { color: colors.heading, fontSize: 34, fontWeight: '900', marginTop: 8 },
-  body: { color: colors.muted, fontSize: 15, lineHeight: 23, marginTop: 10, marginBottom: 4 },
-  label: { color: colors.heading, fontSize: 15, fontWeight: '800', marginBottom: 10, marginTop: 4 },
-  options: { flexDirection: 'row', gap: 10, marginBottom: 22 },
-  optionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 22 },
-  selected: { backgroundColor: colors.primary },
-  option: { borderColor: colors.borderStrong, borderRadius: 999, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 11 },
-  optionDisabled: { opacity: 0.35 },
-  selectedText: { color: colors.primaryContrast, fontWeight: '800' },
-  optionText: { color: colors.text, fontWeight: '700' },
-  optionTextDisabled: { color: colors.subtle },
-  dateInput: {
-    backgroundColor: colors.surfaceSoft,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    marginBottom: 22,
-  },
-  dateInputText: { color: colors.text, fontSize: 15 },
-  dateInputPlaceholder: { color: colors.subtle, fontSize: 15 },
-  summary: { color: colors.text, fontSize: 14, lineHeight: 22, marginBottom: 16 },
-  summaryTotal: { color: colors.primary, fontWeight: '800' },
-  error: { color: colors.danger, fontSize: 14, marginBottom: 12 },
-});

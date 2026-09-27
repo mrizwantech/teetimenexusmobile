@@ -33,9 +33,28 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
     }
   }
 
+  const responseText = await response.text();
+
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}.`);
+    let message = `API request failed with status ${response.status}.`;
+    if (responseText.trim()) {
+      try {
+        const errorBody = JSON.parse(responseText) as { message?: string };
+        if (errorBody.message) message = errorBody.message;
+      } catch {
+        // Keep the generic status message when the server returns non-JSON text.
+      }
+    }
+    throw new Error(message);
   }
 
-  return response.json() as Promise<T>;
+  if (!responseText.trim()) {
+    return undefined as T;
+  }
+
+  try {
+    return JSON.parse(responseText) as T;
+  } catch {
+    throw new Error('The server returned an invalid response. Please try again.');
+  }
 }
