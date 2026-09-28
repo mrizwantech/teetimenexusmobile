@@ -14,7 +14,7 @@ export type TokenPair = {
     token_type: string;
 };
 
-type LoginResponse = TokenPair & { user: AuthUser };
+type LoginResponse = TokenPair & { user: AuthUser; welcome_email_sent?: boolean };
 
 async function parseErrorMessage(response: Response): Promise<string> {
     try {
@@ -43,6 +43,36 @@ export async function login(username: string, password: string): Promise<LoginRe
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ username, password }).toString(),
+    });
+
+    if (!response.ok) {
+        throw new Error(await parseErrorMessage(response));
+    }
+
+    const data = await parseJsonResponse<LoginResponse>(response);
+    await storeTokens(data);
+    return data;
+}
+
+export async function registerAccount(params: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    smsOptIn?: boolean;
+    promoOptIn?: boolean;
+}): Promise<LoginResponse> {
+    const response = await fetch(`${API_BASE_URL}/wp-json/ttn/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            name: params.name.trim(),
+            email: params.email.trim(),
+            password: params.password,
+            phone: params.phone?.trim() ?? '',
+            sms_opt_in: params.smsOptIn ? '1' : '0',
+            promo_opt_in: params.promoOptIn ? '1' : '0',
+        }).toString(),
     });
 
     if (!response.ok) {

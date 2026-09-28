@@ -40,7 +40,11 @@ export async function apiRequest<T>(path: string, options?: RequestInit): Promis
     if (responseText.trim()) {
       try {
         const errorBody = JSON.parse(responseText) as { message?: string };
-        if (errorBody.message) message = errorBody.message;
+        if (errorBody.message === 'Authorization Bearer token required.') {
+          message = 'Guest checkout is not enabled yet. Please sign in or contact support.';
+        } else if (errorBody.message) {
+          message = errorBody.message;
+        }
       } catch {
         // Keep the generic status message when the server returns non-JSON text.
       }

@@ -107,6 +107,11 @@ export const signaturePadStyles = StyleSheet.create({
 
 export const checkoutStyles = StyleSheet.create({
   center: { alignItems: 'center', backgroundColor: colors.bg, flex: 1, justifyContent: 'center', padding: 24 },
+  checkoutScreen: { backgroundColor: colors.bg, flex: 1 },
+  checkoutHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', padding: 16 },
+  checkoutTitle: { color: colors.heading, fontSize: 14, fontWeight: '800' },
+  back: { color: colors.heading, fontSize: 30, lineHeight: 30 },
+  headerSpacer: { width: 24 },
   text: { color: colors.muted, fontSize: 15, marginTop: 14 },
   error: { color: colors.danger, fontSize: 15, textAlign: 'center' },
   confirmationLabel: { color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
@@ -165,6 +170,11 @@ export const accountStyles = StyleSheet.create({
   passwordRow: { position: 'relative', justifyContent: 'center' },
   passwordInput: { paddingRight: spacing.xl },
   eyeButton: { position: 'absolute', right: spacing.sm, padding: spacing.xs },
+  consentRow: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  checkbox: { alignItems: 'center', backgroundColor: colors.bg, borderColor: '#FFFFFF', borderRadius: 5, borderWidth: 2, height: 22, justifyContent: 'center', marginTop: 1, width: 22 },
+  checkboxSelected: { backgroundColor: colors.primary },
+  checkboxMark: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', lineHeight: 17 },
+  consentText: { color: colors.text, flex: 1, fontSize: 13, lineHeight: 19 },
 });
 
 export const homeStyles = StyleSheet.create({

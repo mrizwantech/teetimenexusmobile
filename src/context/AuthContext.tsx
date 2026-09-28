@@ -7,12 +7,14 @@ import {
     login as apiLogin,
     logout as apiLogout,
     refreshAccessToken,
+    registerAccount as apiRegisterAccount,
 } from '../api/auth';
 
 type AuthContextValue = {
     user: AuthUser | null;
     isLoading: boolean;
     login: (username: string, password: string) => Promise<void>;
+    register: (params: { name: string; email: string; password: string; phone?: string; smsOptIn?: boolean; promoOptIn?: boolean }) => Promise<boolean>;
     logout: () => Promise<void>;
 };
 
@@ -53,6 +55,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
             login: async (username, password) => {
                 const result = await apiLogin(username, password);
                 if (mountedRef.current) setUser(result.user);
+            },
+            register: async (params) => {
+                const result = await apiRegisterAccount(params);
+                if (mountedRef.current) setUser(result.user);
+                return result.welcome_email_sent === true;
             },
             logout: async () => {
                 await apiLogout();

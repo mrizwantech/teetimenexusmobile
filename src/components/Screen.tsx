@@ -7,7 +7,7 @@ import { screenStyles as styles } from '../theme';
 export function Screen({ children, scrollRef }: PropsWithChildren<{ scrollRef?: Ref<ScrollView> }>) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {children}
       </ScrollView>
     </SafeAreaView>

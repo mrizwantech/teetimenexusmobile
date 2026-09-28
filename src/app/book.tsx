@@ -9,6 +9,7 @@ import { getVerificationStatus, submitVerification } from '../api/verification';
 import { BrandMark } from '../components/BrandMark';
 import { BayCard } from '../components/BayCard';
 import { BayTypeCard } from '../components/BayTypeCard';
+import { BookingAuthGate } from '../components/BookingAuthGate';
 import { BookingProgress } from '../components/BookingProgress';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
@@ -73,6 +74,7 @@ export default function BookScreen() {
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       try {
         const [bayList, slots] = await Promise.all([getBays(), getTimeSlots()]);
@@ -82,7 +84,7 @@ export default function BookScreen() {
         setLoadError('Unable to load booking options. Please check your connection and try again.');
       }
     })();
-  }, []);
+  }, [user]);
 
   const selectedBay = useMemo(() => bays.find((bay) => bay.key === bayKey) ?? null, [bays, bayKey]);
   const visibleBays = useMemo(() => (bayType ? bays.filter((bay) => isBayVisibleForType(bay, bayType)) : []), [bays, bayType]);
@@ -161,7 +163,7 @@ export default function BookScreen() {
 
   const totalPrice = selectedBay && duration ? selectedBay.hourly_price * duration : 0;
   const selectionsComplete = Boolean(selectedBay && date && duration && players && time);
-  const verificationComplete = alreadyVerified || Boolean(idImage && hasSignature && termsAccepted);
+  const verificationComplete = !user || alreadyVerified || Boolean(idImage && hasSignature && termsAccepted);
   const readyToContinue = selectionsComplete && verificationComplete;
   const bookingProgress = [
     Boolean(bayType),
@@ -217,17 +219,9 @@ export default function BookScreen() {
   async function handleContinue() {
     if (!selectedBay || !date || !duration || !players || !time) return;
 
-    if (!user) {
-      Alert.alert('Log in required', 'Please log in or create an account to complete your booking.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Go to account', onPress: () => router.push('/account') },
-      ]);
-      return;
-    }
-
     setContinuing(true);
     try {
-      if (!alreadyVerified) {
+      if (user && !alreadyVerified) {
         if (!idImage || !signatureRef.current?.hasSignature()) {
           Alert.alert('Verification incomplete', 'Please upload your ID and sign before continuing.');
           return;
@@ -270,174 +264,179 @@ export default function BookScreen() {
 
   return (
     <Screen scrollRef={scrollRef}>
-      <ScreenHeader>
-        <BrandMark />
-        <Text style={styles.step}>RESERVE A BAY</Text>
-      </ScreenHeader>
-      <BookingProgress completed={bookingProgress} activeIndex={currentStep} onStepPress={setCurrentStep} />
+      {!user ? <BookingAuthGate /> : null}
+      {user ? <>
+        <ScreenHeader>
+          <BrandMark />
+          <Text style={styles.step}>RESERVE A BAY</Text>
+        </ScreenHeader>
+        <BookingProgress completed={bookingProgress} activeIndex={currentStep} onStepPress={setCurrentStep} />
 
-      <Text style={styles.title}>Book your session</Text>
-      <Text style={styles.body}>Select your bay type, choose a bay, pick your date and time, then proceed to payment.</Text>
+        <Text style={styles.title}>Book your session</Text>
+        <Text style={styles.body}>Select your bay type, choose a bay, pick your date and time, then proceed to payment.</Text>
 
-      {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
+        {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
 
-      <SectionCard>
-        {currentStep === 0 ? (
-          <>
-            <Text style={styles.sectionHeading}>Choose your bay type</Text>
-            <Text style={styles.hint}>Select the setup that matches your swing.</Text>
-            <View style={styles.bayGrid}>
-              <BayTypeCard
-                label="Right handed"
-                image="https://images.unsplash.com/photo-1593111774278-0b6b02b7961c?auto=format&fit=crop&w=900&q=85"
-                selected={bayType === 'right-handed'}
-                onPress={() => handleBayTypeSelect('right-handed')}
+        <SectionCard>
+          {currentStep === 0 ? (
+            <>
+              <Text style={styles.sectionHeading}>Choose your bay type</Text>
+              <Text style={styles.hint}>Select the setup that matches your swing.</Text>
+              <View style={styles.bayGrid}>
+                <BayTypeCard
+                  label="Right handed"
+                  image="https://images.unsplash.com/photo-1593111774278-0b6b02b7961c?auto=format&fit=crop&w=900&q=85"
+                  selected={bayType === 'right-handed'}
+                  onPress={() => handleBayTypeSelect('right-handed')}
+                />
+                <BayTypeCard
+                  label="Left handed"
+                  image="https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&w=900&q=85"
+                  selected={bayType === 'left-handed'}
+                  onPress={() => handleBayTypeSelect('left-handed')}
+                />
+              </View>
+            </>
+          ) : null}
+
+          {currentStep === 1 ? (
+            <>
+              <Text style={styles.sectionHeading}>Choose your bay</Text>
+              <View style={styles.bayGrid}>
+                {visibleBays.map((bay, index) => (
+                  <BayCard
+                    key={bay.key}
+                    bay={bay}
+                    index={index}
+                    selected={bayKey === bay.key}
+                    onPress={() => {
+                      setBayKey(bay.key);
+                      setDuration(null);
+                      setTime(null);
+                      setBookedTimes([]);
+                      setCurrentStep(2);
+                    }}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {currentStep === 2 ? (
+            <>
+              <Text style={styles.sectionHeading}>Choose a date</Text>
+              <InlineCalendar month={calendarMonth} selectedDate={date} onMonthChange={setCalendarMonth} onSelectDate={selectDate} />
+            </>
+          ) : null}
+
+          {currentStep === 3 ? (
+            <>
+              <Text style={styles.sectionHeading}>Choose duration</Text>
+              <View style={styles.optionsWrap}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
+                  <Pill
+                    key={hours}
+                    label={`${hours} ${hours === 1 ? 'Hour' : 'Hours'}`}
+                    selected={duration === hours}
+                    disabled={!isDurationAvailable(hours) || loadingAvailability}
+                    onPress={() => {
+                      setDuration(hours);
+                      setTime(null);
+                      setCurrentStep(4);
+                    }}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {currentStep === 4 ? (
+            <>
+              <Text style={styles.sectionHeading}>How many players?</Text>
+              <View style={styles.optionsWrap}>
+                {[1, 2, 3, 4].map((count) => (
+                  <Pill
+                    key={count}
+                    label={String(count)}
+                    selected={players === count}
+                    onPress={() => {
+                      setPlayers(count);
+                      setCurrentStep(5);
+                    }}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {currentStep === 5 ? (
+            <>
+              <Text style={styles.sectionHeading}>Choose a start time</Text>
+              <View style={styles.optionsWrap}>
+                {timeSlots.map((slot, index) => (
+                  <Pill
+                    key={slot.label}
+                    label={slot.label}
+                    selected={time === slot.label}
+                    disabled={!isTimeSlotAvailable(index)}
+                    onPress={() => {
+                      setTime(slot.label);
+                      setCurrentStep(6);
+                    }}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {currentStep === 6 ? (
+            <>
+              <Text style={styles.summary}>
+                {selectedBay?.name} • {date && formatDate(date)} • {time} ({duration}h) • {players} {players === 1 ? 'player' : 'players'}
+                {'\n'}
+                <Text style={styles.summaryTotal}>Total: ${totalPrice}</Text>
+              </Text>
+
+              <Text style={styles.sectionHeading}>Verify your reservation</Text>
+              {!user ? (
+                <Text style={styles.verifiedNote}>Guest checkout is available. Your contact and payment details will be collected securely on the next screen.</Text>
+              ) : alreadyVerified ? (
+                <Text style={styles.verifiedNote}>✓ Using the ID, signature, and terms already on file for your account.</Text>
+              ) : (
+                <>
+                  <Text style={styles.label}>Upload a photo of your government-issued ID</Text>
+                  {idImage ? <Image source={{ uri: idImage.uri }} style={styles.idPreview} resizeMode="cover" /> : null}
+                  <Pressable style={styles.uploadButton} onPress={pickIdDocument}>
+                    <Text style={styles.uploadButtonText}>{idImage ? 'Change photo' : 'Choose photo'}</Text>
+                  </Pressable>
+                  <Text style={styles.hint}>JPG or PNG, up to 8MB. Stored encrypted and only viewable by our staff.</Text>
+
+                  <Text style={[styles.label, styles.labelSpacer]}>Sign to confirm your reservation</Text>
+                  <SignaturePad ref={signatureRef} onChange={setHasSignature} />
+                  <Pressable style={styles.clearButton} onPress={() => { signatureRef.current?.clear(); setHasSignature(false); }}>
+                    <Text style={styles.clearButtonText}>Clear signature</Text>
+                  </Pressable>
+
+                  <Pressable style={styles.termsRow} onPress={() => setTermsAccepted((prev) => !prev)}>
+                    <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+                      {termsAccepted ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                    </View>
+                    <Text style={styles.termsText}>I have read and agree to the Terms and Conditions.</Text>
+                  </Pressable>
+                </>
+              )}
+
+              <PrimaryButton
+                label={continuing ? 'Please wait…' : 'Continue to payment'}
+                onPress={handleContinue}
+                disabled={!readyToContinue || continuing}
               />
-              <BayTypeCard
-                label="Left handed"
-                image="https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&w=900&q=85"
-                selected={bayType === 'left-handed'}
-                onPress={() => handleBayTypeSelect('left-handed')}
-              />
-            </View>
-          </>
-        ) : null}
+            </>
+          ) : null}
 
-        {currentStep === 1 ? (
-          <>
-            <Text style={styles.sectionHeading}>Choose your bay</Text>
-            <View style={styles.bayGrid}>
-              {visibleBays.map((bay, index) => (
-                <BayCard
-                  key={bay.key}
-                  bay={bay}
-                  index={index}
-                  selected={bayKey === bay.key}
-                  onPress={() => {
-                    setBayKey(bay.key);
-                    setDuration(null);
-                    setTime(null);
-                    setBookedTimes([]);
-                    setCurrentStep(2);
-                  }}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {currentStep === 2 ? (
-          <>
-            <Text style={styles.sectionHeading}>Choose a date</Text>
-            <InlineCalendar month={calendarMonth} selectedDate={date} onMonthChange={setCalendarMonth} onSelectDate={selectDate} />
-          </>
-        ) : null}
-
-        {currentStep === 3 ? (
-          <>
-            <Text style={styles.sectionHeading}>Choose duration</Text>
-            <View style={styles.optionsWrap}>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
-                <Pill
-                  key={hours}
-                  label={`${hours} ${hours === 1 ? 'Hour' : 'Hours'}`}
-                  selected={duration === hours}
-                  disabled={!isDurationAvailable(hours) || loadingAvailability}
-                  onPress={() => {
-                    setDuration(hours);
-                    setTime(null);
-                    setCurrentStep(4);
-                  }}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {currentStep === 4 ? (
-          <>
-            <Text style={styles.sectionHeading}>How many players?</Text>
-            <View style={styles.optionsWrap}>
-              {[1, 2, 3, 4].map((count) => (
-                <Pill
-                  key={count}
-                  label={String(count)}
-                  selected={players === count}
-                  onPress={() => {
-                    setPlayers(count);
-                    setCurrentStep(5);
-                  }}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {currentStep === 5 ? (
-          <>
-            <Text style={styles.sectionHeading}>Choose a start time</Text>
-            <View style={styles.optionsWrap}>
-              {timeSlots.map((slot, index) => (
-                <Pill
-                  key={slot.label}
-                  label={slot.label}
-                  selected={time === slot.label}
-                  disabled={!isTimeSlotAvailable(index)}
-                  onPress={() => {
-                    setTime(slot.label);
-                    setCurrentStep(6);
-                  }}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {currentStep === 6 ? (
-          <>
-            <Text style={styles.summary}>
-              {selectedBay?.name} • {date && formatDate(date)} • {time} ({duration}h) • {players} {players === 1 ? 'player' : 'players'}
-              {'\n'}
-              <Text style={styles.summaryTotal}>Total: ${totalPrice}</Text>
-            </Text>
-
-            <Text style={styles.sectionHeading}>Verify your reservation</Text>
-            {alreadyVerified ? (
-              <Text style={styles.verifiedNote}>✓ Using the ID, signature, and terms already on file for your account.</Text>
-            ) : (
-              <>
-                <Text style={styles.label}>Upload a photo of your government-issued ID</Text>
-                {idImage ? <Image source={{ uri: idImage.uri }} style={styles.idPreview} resizeMode="cover" /> : null}
-                <Pressable style={styles.uploadButton} onPress={pickIdDocument}>
-                  <Text style={styles.uploadButtonText}>{idImage ? 'Change photo' : 'Choose photo'}</Text>
-                </Pressable>
-                <Text style={styles.hint}>JPG or PNG, up to 8MB. Stored encrypted and only viewable by our staff.</Text>
-
-                <Text style={[styles.label, styles.labelSpacer]}>Sign to confirm your reservation</Text>
-                <SignaturePad ref={signatureRef} onChange={setHasSignature} />
-                <Pressable style={styles.clearButton} onPress={() => { signatureRef.current?.clear(); setHasSignature(false); }}>
-                  <Text style={styles.clearButtonText}>Clear signature</Text>
-                </Pressable>
-
-                <Pressable style={styles.termsRow} onPress={() => setTermsAccepted((prev) => !prev)}>
-                  <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
-                    {termsAccepted ? <Text style={styles.checkboxMark}>✓</Text> : null}
-                  </View>
-                  <Text style={styles.termsText}>I have read and agree to the Terms and Conditions.</Text>
-                </Pressable>
-              </>
-            )}
-
-            <PrimaryButton
-              label={continuing ? 'Please wait…' : 'Continue to payment'}
-              onPress={handleContinue}
-              disabled={!readyToContinue || continuing}
-            />
-          </>
-        ) : null}
-
-        {currentStep > 0 ? <PrimaryButton label="Back" onPress={goBack} secondary /> : null}
-      </SectionCard>
+          {currentStep > 0 ? <PrimaryButton label="Back" onPress={goBack} secondary /> : null}
+        </SectionCard>
+      </> : null}
     </Screen>
   );
 }
