@@ -7,6 +7,9 @@ import { Bay, getAvailability, getBays, getTimeSlots, TimeSlot } from '../api/bo
 import { startCheckout } from '../api/checkout';
 import { getVerificationStatus, submitVerification } from '../api/verification';
 import { BrandMark } from '../components/BrandMark';
+import { BayCard } from '../components/BayCard';
+import { BayTypeCard } from '../components/BayTypeCard';
+import { BookingProgress } from '../components/BookingProgress';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
@@ -42,6 +45,7 @@ export default function BookScreen() {
   const [duration, setDuration] = useState<number | null>(null);
   const [players, setPlayers] = useState<number | null>(null);
   const [time, setTime] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
 
@@ -159,6 +163,15 @@ export default function BookScreen() {
   const selectionsComplete = Boolean(selectedBay && date && duration && players && time);
   const verificationComplete = alreadyVerified || Boolean(idImage && hasSignature && termsAccepted);
   const readyToContinue = selectionsComplete && verificationComplete;
+  const bookingProgress = [
+    Boolean(bayType),
+    Boolean(selectedBay),
+    Boolean(date),
+    Boolean(duration),
+    Boolean(players),
+    Boolean(time),
+    verificationComplete,
+  ];
 
   function scrollToLatestStep() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
@@ -169,6 +182,7 @@ export default function BookScreen() {
     setDuration(null);
     setPlayers(null);
     setTime(null);
+    setCurrentStep(3);
     scrollToLatestStep();
   }
 
@@ -193,6 +207,11 @@ export default function BookScreen() {
     setPlayers(null);
     setTime(null);
     setBookedTimes([]);
+    setCurrentStep(1);
+  }
+
+  function goBack() {
+    setCurrentStep((step) => Math.max(0, step - 1));
   }
 
   async function handleContinue() {
@@ -231,7 +250,17 @@ export default function BookScreen() {
         duration,
         players,
       });
-      router.push({ pathname: '/checkout', params: { url: bridge_url } });
+      router.push({
+        pathname: '/checkout',
+        params: {
+          url: bridge_url,
+          bay: selectedBay.name,
+          date: formatDate(date),
+          time,
+          duration: String(duration),
+          players: String(players),
+        },
+      });
     } catch (err) {
       Alert.alert('Unable to continue', err instanceof Error ? err.message : 'Please try again.');
     } finally {
@@ -245,6 +274,7 @@ export default function BookScreen() {
         <BrandMark />
         <Text style={styles.step}>RESERVE A BAY</Text>
       </ScreenHeader>
+      <BookingProgress completed={bookingProgress} activeIndex={currentStep} onStepPress={setCurrentStep} />
 
       <Text style={styles.title}>Book your session</Text>
       <Text style={styles.body}>Select your bay type, choose a bay, pick your date and time, then proceed to payment.</Text>
@@ -252,26 +282,43 @@ export default function BookScreen() {
       {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
 
       <SectionCard>
-        <Text style={styles.label}>Bay type</Text>
-        <View style={styles.options}>
-          <Pill label="Right handed" selected={bayType === 'right-handed'} onPress={() => handleBayTypeSelect('right-handed')} />
-          <Pill label="Left handed" selected={bayType === 'left-handed'} onPress={() => handleBayTypeSelect('left-handed')} />
-        </View>
-
-        {bayType ? (
+        {currentStep === 0 ? (
           <>
-            <Text style={styles.label}>Bay</Text>
-            <View style={styles.optionsWrap}>
-              {visibleBays.map((bay) => (
-                <Pill
+            <Text style={styles.sectionHeading}>Choose your bay type</Text>
+            <Text style={styles.hint}>Select the setup that matches your swing.</Text>
+            <View style={styles.bayGrid}>
+              <BayTypeCard
+                label="Right handed"
+                image="https://images.unsplash.com/photo-1593111774278-0b6b02b7961c?auto=format&fit=crop&w=900&q=85"
+                selected={bayType === 'right-handed'}
+                onPress={() => handleBayTypeSelect('right-handed')}
+              />
+              <BayTypeCard
+                label="Left handed"
+                image="https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&w=900&q=85"
+                selected={bayType === 'left-handed'}
+                onPress={() => handleBayTypeSelect('left-handed')}
+              />
+            </View>
+          </>
+        ) : null}
+
+        {currentStep === 1 ? (
+          <>
+            <Text style={styles.sectionHeading}>Choose your bay</Text>
+            <View style={styles.bayGrid}>
+              {visibleBays.map((bay, index) => (
+                <BayCard
                   key={bay.key}
-                  label={bay.name}
+                  bay={bay}
+                  index={index}
                   selected={bayKey === bay.key}
                   onPress={() => {
                     setBayKey(bay.key);
                     setDuration(null);
                     setTime(null);
                     setBookedTimes([]);
+                    setCurrentStep(2);
                   }}
                 />
               ))}
@@ -279,40 +326,37 @@ export default function BookScreen() {
           </>
         ) : null}
 
-        {selectedBay ? (
+        {currentStep === 2 ? (
           <>
-            <Text style={styles.label}>Date</Text>
+            <Text style={styles.sectionHeading}>Choose a date</Text>
             <InlineCalendar month={calendarMonth} selectedDate={date} onMonthChange={setCalendarMonth} onSelectDate={selectDate} />
           </>
         ) : null}
 
-        {selectedBay && date ? (
+        {currentStep === 3 ? (
           <>
-            <Text style={styles.label}>Duration (hours)</Text>
+            <Text style={styles.sectionHeading}>Choose duration</Text>
             <View style={styles.optionsWrap}>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => {
-                const available = isDurationAvailable(hours);
-                return (
-                  <Pill
-                    key={hours}
-                    label={`${hours} ${hours === 1 ? 'Hour' : 'Hours'}`}
-                    selected={duration === hours}
-                    disabled={!available || loadingAvailability}
-                    onPress={() => {
-                      setDuration(hours);
-                      setTime(null);
-                      scrollToLatestStep();
-                    }}
-                  />
-                );
-              })}
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
+                <Pill
+                  key={hours}
+                  label={`${hours} ${hours === 1 ? 'Hour' : 'Hours'}`}
+                  selected={duration === hours}
+                  disabled={!isDurationAvailable(hours) || loadingAvailability}
+                  onPress={() => {
+                    setDuration(hours);
+                    setTime(null);
+                    setCurrentStep(4);
+                  }}
+                />
+              ))}
             </View>
           </>
         ) : null}
 
-        {selectedBay && date && duration ? (
+        {currentStep === 4 ? (
           <>
-            <Text style={styles.label}>Players</Text>
+            <Text style={styles.sectionHeading}>How many players?</Text>
             <View style={styles.optionsWrap}>
               {[1, 2, 3, 4].map((count) => (
                 <Pill
@@ -321,7 +365,7 @@ export default function BookScreen() {
                   selected={players === count}
                   onPress={() => {
                     setPlayers(count);
-                    scrollToLatestStep();
+                    setCurrentStep(5);
                   }}
                 />
               ))}
@@ -329,9 +373,9 @@ export default function BookScreen() {
           </>
         ) : null}
 
-        {selectedBay && date && duration && players ? (
+        {currentStep === 5 ? (
           <>
-            <Text style={styles.label}>Start time</Text>
+            <Text style={styles.sectionHeading}>Choose a start time</Text>
             <View style={styles.optionsWrap}>
               {timeSlots.map((slot, index) => (
                 <Pill
@@ -341,7 +385,7 @@ export default function BookScreen() {
                   disabled={!isTimeSlotAvailable(index)}
                   onPress={() => {
                     setTime(slot.label);
-                    scrollToLatestStep();
+                    setCurrentStep(6);
                   }}
                 />
               ))}
@@ -349,7 +393,7 @@ export default function BookScreen() {
           </>
         ) : null}
 
-        {selectionsComplete ? (
+        {currentStep === 6 ? (
           <>
             <Text style={styles.summary}>
               {selectedBay?.name} • {date && formatDate(date)} • {time} ({duration}h) • {players} {players === 1 ? 'player' : 'players'}
@@ -371,13 +415,7 @@ export default function BookScreen() {
 
                 <Text style={[styles.label, styles.labelSpacer]}>Sign to confirm your reservation</Text>
                 <SignaturePad ref={signatureRef} onChange={setHasSignature} />
-                <Pressable
-                  style={styles.clearButton}
-                  onPress={() => {
-                    signatureRef.current?.clear();
-                    setHasSignature(false);
-                  }}
-                >
+                <Pressable style={styles.clearButton} onPress={() => { signatureRef.current?.clear(); setHasSignature(false); }}>
                   <Text style={styles.clearButtonText}>Clear signature</Text>
                 </Pressable>
 
@@ -389,14 +427,16 @@ export default function BookScreen() {
                 </Pressable>
               </>
             )}
+
+            <PrimaryButton
+              label={continuing ? 'Please wait…' : 'Continue to payment'}
+              onPress={handleContinue}
+              disabled={!readyToContinue || continuing}
+            />
           </>
         ) : null}
 
-        <PrimaryButton
-          label={continuing ? 'Please wait…' : 'Continue to payment'}
-          onPress={handleContinue}
-          disabled={!readyToContinue || continuing}
-        />
+        {currentStep > 0 ? <PrimaryButton label="Back" onPress={goBack} secondary /> : null}
       </SectionCard>
     </Screen>
   );

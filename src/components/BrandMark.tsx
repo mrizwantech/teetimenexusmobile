@@ -1,12 +1,7 @@
-import { Text, View } from 'react-native';
+import { Image } from 'react-native';
 
 import { brandMarkStyles as styles } from '../theme';
 
 export function BrandMark() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.top}>TEE TIME</Text>
-      <Text style={styles.bottom}>NEXUS</Text>
-    </View>
-  );
+  return <Image source={require('../../assets/tee-time-nexus-text-logo.png')} style={styles.image} resizeMode="contain" />;
 }

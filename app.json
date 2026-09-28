@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "tee-time-nexus-mobile",
+    "name": "Tee Time Nexus",
     "slug": "tee-time-nexus-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -28,7 +28,23 @@
       "expo-router",
       "expo-status-bar",
       "@react-native-community/datetimepicker",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/teetimenexusspashscreen.png",
+          "resizeMode": "cover",
+          "enableFullScreenImage_legacy": true
+        }
+      ]
     ]
   }
 }

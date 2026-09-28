@@ -46,19 +46,7 @@ export const shadows = Platform.select({
 });
 
 export const brandMarkStyles = StyleSheet.create({
-  container: { gap: 1 },
-  top: {
-    color: colors.heading,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2.2,
-  },
-  bottom: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 2.4,
-  },
+  image: { width: 128, height: 39 },
 });
 
 export const primaryButtonStyles = StyleSheet.create({
@@ -121,6 +109,10 @@ export const checkoutStyles = StyleSheet.create({
   center: { alignItems: 'center', backgroundColor: colors.bg, flex: 1, justifyContent: 'center', padding: 24 },
   text: { color: colors.muted, fontSize: 15, marginTop: 14 },
   error: { color: colors.danger, fontSize: 15, textAlign: 'center' },
+  confirmationLabel: { color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  confirmationCenter: { gap: spacing.lg },
+  confirmationTitle: { color: colors.heading, fontSize: 32, fontWeight: '900' },
+  confirmationBody: { color: colors.muted, fontSize: 15, lineHeight: 23 },
 });
 
 export const membershipStyles = StyleSheet.create({
@@ -173,7 +165,6 @@ export const accountStyles = StyleSheet.create({
   passwordRow: { position: 'relative', justifyContent: 'center' },
   passwordInput: { paddingRight: spacing.xl },
   eyeButton: { position: 'absolute', right: spacing.sm, padding: spacing.xs },
-  eyeIcon: { fontSize: 18 },
 });
 
 export const homeStyles = StyleSheet.create({
@@ -217,6 +208,7 @@ export const bookingStyles = StyleSheet.create({
   label: { color: colors.heading, fontSize: 15, fontWeight: '800', marginBottom: 10, marginTop: 4 },
   options: { flexDirection: 'row', gap: 10, marginBottom: 22 },
   optionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 22 },
+  bayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   selected: { backgroundColor: colors.primary },
   option: { borderColor: colors.borderStrong, borderRadius: 999, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 11 },
   optionDisabled: { opacity: 0.35 },

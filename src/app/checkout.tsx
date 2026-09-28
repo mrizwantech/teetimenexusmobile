@@ -6,7 +6,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { checkoutStyles as styles, colors } from '../theme';
 
 export default function CheckoutScreen() {
-    const { url } = useLocalSearchParams<{ url: string }>();
+    const { url, bay, date, time, duration, players } = useLocalSearchParams<{ url: string; bay?: string; date?: string; time?: string; duration?: string; players?: string }>();
     const openedRef = useRef(false);
     const [error, setError] = useState('');
 
@@ -16,8 +16,11 @@ export default function CheckoutScreen() {
 
         WebBrowser.openBrowserAsync(url)
             .catch(() => setError('Checkout could not be opened. Please try again.'))
-            .finally(() => router.back());
-    }, [url]);
+            .finally(() => router.replace({
+                pathname: '/confirmation',
+                params: { bay, date, time, duration, players },
+            }));
+    }, [url, bay, date, time, duration, players]);
 
     if (error) {
         return <View style={styles.center}><Text style={styles.error}>{error}</Text></View>;
