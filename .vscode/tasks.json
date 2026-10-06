@@ -1,0 +1,18 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run on connected iPhone",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"expo",
+				"run:ios",
+				"--device",
+				"00008150-001471D02E32401C"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}

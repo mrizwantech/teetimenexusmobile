@@ -41,7 +41,7 @@ export function ProfileScreen({ user }: ProfileScreenProps) {
                 <ProfileRow icon="♧" label="Membership" value={membership?.package_name || 'Founding Member'} onPress={() => router.push('/membership')} />
                 <ProfileRow icon="▣" label="Payment Methods" value="•••• 4242" onPress={() => Alert.alert('Payment methods', 'Payment methods will be available here.')} />
                 <ProfileRow icon="▣" label="Reservations" onPress={() => router.push('/reservations')} />
-                <ProfileRow icon="♧" label="Notifications" onPress={() => Alert.alert('Notifications', 'You are all caught up.')} />
+                <ProfileRow icon="♧" label="Notifications" onPress={() => router.push('/notifications')} />
                 <ProfileRow icon="⚙" label="Account Settings" onPress={() => Alert.alert('Account settings', 'Account settings will be available here.')} />
                 <ProfileRow icon="?" label="Help & Support" onPress={() => Alert.alert('Help & Support', 'Please contact Tee Time Nexus support.')} />
             </View>

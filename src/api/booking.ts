@@ -7,6 +7,7 @@ export type Bay = {
     location: string;
     premium: boolean;
     hourly_price: number;
+    thumbnail_url?: string | null;
 };
 
 export type TimeSlot = { label: string; start: string };

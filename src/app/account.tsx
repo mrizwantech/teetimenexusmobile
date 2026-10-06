@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Link, router, useLocalSearchParams } from 'expo-router';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 
 import { BrandMark } from '../components/BrandMark';
 import { PasswordVisibilityIcon } from '../components/PasswordVisibilityIcon';
@@ -13,7 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { accountStyles as styles, colors, spacing } from '../theme';
 
 export default function AccountScreen() {
-  const { user, isLoading, login } = useAuth();
+  const { user, isLoading, login, loginWithApple } = useAuth();
   const { register } = useAuth();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const [isRegistering, setIsRegistering] = useState(false);
@@ -26,12 +28,26 @@ export default function AccountScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const mountedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    let cancelled = false;
+    AppleAuthentication.isAvailableAsync().then((available) => {
+      if (!cancelled) setAppleAvailable(available);
+    }).catch(() => {
+      if (!cancelled) setAppleAvailable(false);
+    });
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -48,6 +64,38 @@ export default function AccountScreen() {
       }
     } catch (err) {
       if (mountedRef.current) setError(err instanceof Error ? err.message : 'Unable to log in.');
+    } finally {
+      if (mountedRef.current) setSubmitting(false);
+    }
+  }
+
+  async function handleAppleLogin() {
+    if (!mountedRef.current || submitting) return;
+    setError('');
+    setSubmitting(true);
+    try {
+      const nonce = Crypto.randomUUID();
+      const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, nonce);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('Apple did not return an identity token. Please try again.');
+      }
+
+      const name = credential.fullName
+        ? AppleAuthentication.formatFullName(credential.fullName).trim()
+        : undefined;
+      await loginWithApple(credential.identityToken, nonce, name || undefined);
+      if (mountedRef.current && returnTo === '/book') router.replace('/book');
+    } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'ERR_REQUEST_CANCELED') return;
+      if (mountedRef.current) setError(err instanceof Error ? err.message : 'Unable to sign in with Apple.');
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }
@@ -111,6 +159,7 @@ export default function AccountScreen() {
         <Text style={styles.label}>ACCOUNT</Text>
       </ScreenHeader>
       <Text style={styles.title}>Your golf, organized.</Text>
+      <Link href="/notifications" asChild><PrimaryButton label="NOTIFICATION SETTINGS" secondary /></Link>
       <SectionCard>
         <Text style={styles.cardTitle}>{isRegistering ? 'Create your account' : 'Log in'}</Text>
         <Text style={styles.body}>{isRegistering ? 'Create an account to manage bookings and memberships.' : 'Log in to manage bookings, view membership perks, and keep your history in one place.'}</Text>
@@ -171,6 +220,18 @@ export default function AccountScreen() {
           </Pressable>
         </> : null}
         <PrimaryButton label={submitting ? 'Please wait…' : isRegistering ? 'Create account' : 'Log in'} onPress={isRegistering ? handleRegister : handleLogin} />
+        {!isRegistering && appleAvailable ? (
+          <View style={localStyles.appleSignIn}>
+            <Text style={localStyles.divider}>OR</Text>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={10}
+              style={localStyles.appleButton}
+              onPress={handleAppleLogin}
+            />
+          </View>
+        ) : null}
         <View style={{ marginTop: spacing.sm }}>
           <PrimaryButton label={isRegistering ? 'I already have an account' : 'Create an account'} onPress={() => { setError(''); setIsRegistering((value) => !value); }} secondary />
         </View>
@@ -178,3 +239,9 @@ export default function AccountScreen() {
     </Screen>
   );
 }
+
+const localStyles = StyleSheet.create({
+  appleSignIn: { gap: spacing.sm, marginTop: spacing.sm },
+  divider: { color: colors.muted, fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  appleButton: { height: 50, width: '100%' },
+});

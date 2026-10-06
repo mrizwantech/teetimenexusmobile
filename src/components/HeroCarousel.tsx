@@ -1,100 +1,98 @@
 import { useEffect, useRef, useState } from 'react';
-import { ImageBackground, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 
+import { HomeSlide } from '../api/home-content';
 import { PrimaryButton } from './PrimaryButton';
-import { colors, homeStyles as styles, spacing } from '../theme';
+import { accountStyles as signupFormStyles, colors, homeStyles as styles, spacing } from '../theme';
 
-const slides = [
-    {
-        image: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=1600&q=80',
-        kicker: 'COMING SOON',
-        title: 'Grand opening coming soon.',
-        body: 'We are preparing something special for golfers in the area. Check back soon for updates and opening details.',
-        action: 'Stay tuned',
-    },
-    {
-        image: 'https://images.unsplash.com/photo-1593111774278-0b6b02b7961c?auto=format&fit=crop&w=1600&q=80',
-        kicker: 'OPENING SOON',
-        title: 'A premium simulator experience is on the way.',
-        body: 'Follow our launch updates for bay availability and special early access announcements.',
-        action: 'Follow updates',
-    },
-    {
-        image: 'https://images.unsplash.com/photo-1517466787929-bc90951d0974?auto=format&fit=crop&w=1600&q=80',
-        kicker: 'GRAND OPENING',
-        title: 'Your next round starts here.',
-        body: 'Stay connected for the official opening announcement, booking launch, and member access details.',
-        action: 'Watch for launch',
-    },
-];
-
-export function HeroCarousel() {
+export function HeroCarousel({ slides }: { slides: HomeSlide[] }) {
     const { width: windowWidth } = useWindowDimensions();
-    const slideWidth = Math.max(windowWidth - spacing.lg * 2, 280);
+    const [viewportWidth, setViewportWidth] = useState(Math.max(windowWidth - spacing.lg * 2, 1));
+    const cardWidth = Math.max(1, Math.min(420, viewportWidth - (slides.length > 1 ? 28 : 0)));
+    const cardInterval = cardWidth + spacing.md;
     const scrollRef = useRef<ScrollView>(null);
     const currentIndexRef = useRef(0);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [showSignup, setShowSignup] = useState(false);
 
-    function goToSlide(index: number) {
+    function goToCard(index: number) {
         currentIndexRef.current = index;
         setCurrentIndex(index);
-        scrollRef.current?.scrollTo({ x: index * slideWidth, animated: true });
+        scrollRef.current?.scrollTo({ x: index * cardInterval, animated: true });
     }
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            const nextIndex = (currentIndexRef.current + 1) % slides.length;
-            currentIndexRef.current = nextIndex;
-            setCurrentIndex(nextIndex);
-            scrollRef.current?.scrollTo({ x: nextIndex * slideWidth, animated: true });
-        }, 5000);
+        scrollRef.current?.scrollTo({ x: currentIndexRef.current * cardInterval, animated: false });
+    }, [cardInterval]);
 
-        return () => clearInterval(timer);
-    }, [slideWidth]);
-
+    if (slides.length === 0) return null;
     return (
-        <View style={[styles.carousel, { width: slideWidth }]}>
+        <View style={styles.carousel} onLayout={(event) => setViewportWidth(event.nativeEvent.layout.width)}>
             <ScrollView
                 ref={scrollRef}
                 horizontal
-                pagingEnabled
+                snapToInterval={cardInterval}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                disableIntervalMomentum
+                directionalLockEnabled
+                scrollEnabled={slides.length > 1}
                 showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={(event) => {
-                    const index = Math.round(event.nativeEvent.contentOffset.x / slideWidth);
+                contentContainerStyle={[styles.cardTrack, { paddingRight: viewportWidth - cardWidth }]}
+                onScroll={(event) => {
+                    const index = Math.max(0, Math.min(slides.length - 1, Math.round(event.nativeEvent.contentOffset.x / cardInterval)));
                     currentIndexRef.current = index;
                     setCurrentIndex(index);
                 }}
+                scrollEventThrottle={32}
             >
                 {slides.map((slide) => (
-                    <ImageBackground key={slide.title} source={{ uri: slide.image }} style={[styles.slide, { width: slideWidth }]} imageStyle={styles.slideImage}>
+                    <View key={slide.id} style={[styles.slide, { width: cardWidth }]}>
+                        {slide.image ? <HeroCardImage key={slide.image} uri={slide.image} label={slide.heading} /> : null}
                         <View style={styles.copyPanel}>
                             <Text style={styles.kicker}>{slide.kicker}</Text>
-                            <Text style={styles.title}>{slide.title}</Text>
-                            <Text style={styles.body}>{slide.body}</Text>
-                            {slide.action === 'Stay tuned' ? (
-                                <PrimaryButton label={slide.action} onPress={() => setShowSignup(true)} />
-                            ) : (
-                                <Link href="/book" asChild><PrimaryButton label={slide.action} /></Link>
-                            )}
+                            <Text style={styles.title}>{slide.heading}</Text>
+                            <Text style={styles.body}>{slide.text}</Text>
                         </View>
-                    </ImageBackground>
+                        <View style={styles.cardActions}>
+                            {slide.actions.map((action, index) => (
+                                <Link key={action.route} href={action.route} asChild>
+                                    <PrimaryButton label={action.label} secondary={index > 0} />
+                                </Link>
+                            ))}
+                        </View>
+                    </View>
                 ))}
             </ScrollView>
-            <Pressable accessibilityLabel="Previous slide" accessibilityRole="button" onPress={() => goToSlide((currentIndex - 1 + slides.length) % slides.length)} style={[styles.arrow, styles.previousArrow]}>
-                <Text style={styles.arrowText}>‹</Text>
-            </Pressable>
-            <Pressable accessibilityLabel="Next slide" accessibilityRole="button" onPress={() => goToSlide((currentIndex + 1) % slides.length)} style={[styles.arrow, styles.nextArrow]}>
-                <Text style={styles.arrowText}>›</Text>
-            </Pressable>
-            <View style={styles.dots} accessibilityLabel="Carousel pagination">
-                {slides.map((slide, index) => (
-                    <Pressable key={slide.title} accessibilityLabel={`Go to slide ${index + 1}`} accessibilityRole="button" onPress={() => goToSlide(index)} style={[styles.dot, index === currentIndex && styles.activeDot]} />
-                ))}
-            </View>
-            <StayTunedModal visible={showSignup} onClose={() => setShowSignup(false)} />
+            {slides.length > 1 ? (
+                <View style={styles.cardNavigation}>
+                    <Text style={styles.cardHint}>Swipe to explore</Text>
+                    <View style={styles.dots} accessibilityLabel="Home card pagination">
+                        {slides.map((slide, index) => (
+                            <Pressable key={slide.id} accessibilityLabel={`Go to card ${index + 1}: ${slide.heading}`} accessibilityRole="button" accessibilityState={{ selected: index === currentIndex }} onPress={() => goToCard(index)} style={styles.dotButton}>
+                                <View style={[styles.dot, index === currentIndex && styles.activeDot]} />
+                            </Pressable>
+                        ))}
+                    </View>
+                    <Text style={styles.cardHint}>{currentIndex + 1} / {slides.length}</Text>
+                </View>
+            ) : null}
         </View>
+    );
+}
+
+function HeroCardImage({ uri, label }: { uri: string; label: string }) {
+    const [failed, setFailed] = useState(false);
+    const [attempt, setAttempt] = useState(0);
+
+    return failed ? (
+        <View style={styles.cardImageError}>
+            <Text style={styles.error}>This image could not be loaded.</Text>
+            <PrimaryButton label="RETRY IMAGE" secondary onPress={() => { setFailed(false); setAttempt((value) => value + 1); }} />
+        </View>
+    ) : (
+        <Image key={attempt} source={{ uri }} accessibilityLabel={label} style={styles.slideImage} contentFit="cover" cachePolicy="disk" onError={() => setFailed(true)} />
     );
 }
 
@@ -106,6 +104,7 @@ export function StayTunedModal({ visible, onClose }: { visible: boolean; onClose
     const [error, setError] = useState('');
     const [submitted, setSubmitted] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [focusedField, setFocusedField] = useState<string | null>(null);
 
     useEffect(() => {
         mountedRef.current = true;
@@ -161,40 +160,21 @@ export function StayTunedModal({ visible, onClose }: { visible: boolean; onClose
                         </Pressable>
                         {submitted ? (
                             <>
-                                <Text style={styles.modalTitle}>Be First to Tee Off</Text>
-                                <Text style={styles.modalBody}>Thanks. You are on the Tee Time Nexus launch list.</Text>
+                                <Text style={signupFormStyles.cardTitle}>Be First to Tee Off</Text>
+                                <Text style={signupFormStyles.body}>Thanks. You are on the Tee Time Nexus launch list.</Text>
                                 <PrimaryButton label="DONE" onPress={closeModal} />
                             </>
                         ) : (
                             <>
-                                <Text style={styles.modalTitle}>Be First to Tee Off</Text>
-                                <Text style={styles.modalSubtitle}>Your next round starts here.</Text>
-                                <Text style={styles.modalBody}>
+                                <Text style={signupFormStyles.cardTitle}>Be First to Tee Off</Text>
+                                <Text style={signupFormStyles.body}>
                                     Tee Time Nexus is getting ready to open in Mooresville. Join our list for grand opening updates, early
                                     booking opportunities, and special launch announcements.
                                 </Text>
                                 {error ? <Text style={styles.error}>{error}</Text> : null}
-                                <View style={styles.field}>
-                                    <Text style={styles.fieldLabel}>Full Name</Text>
-                                    <TextInput style={styles.modalInput} placeholder="Full Name" placeholderTextColor={colors.subtle} value={fullName} onChangeText={setFullName} />
-                                </View>
-                                <View style={styles.field}>
-                                    <Text style={styles.fieldLabel}>Email Address</Text>
-                                    <TextInput
-                                        style={styles.modalInput}
-                                        placeholder="Email Address"
-                                        placeholderTextColor={colors.subtle}
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                        value={email}
-                                        onChangeText={setEmail}
-                                    />
-                                </View>
-                                <View style={styles.field}>
-                                    <Text style={styles.fieldLabel}>Phone Number</Text>
-                                    <TextInput style={styles.modalInput} placeholder="Phone Number" placeholderTextColor={colors.subtle} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-                                </View>
+                                <TextInput style={[signupFormStyles.input, focusedField === 'name' && signupFocusStyles.focusedInput]} placeholder="Full name" placeholderTextColor={colors.subtle} value={fullName} onChangeText={setFullName} onFocus={() => setFocusedField('name')} onBlur={() => setFocusedField(null)} />
+                                <TextInput style={[signupFormStyles.input, focusedField === 'email' && signupFocusStyles.focusedInput]} placeholder="Email address" placeholderTextColor={colors.subtle} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} value={email} onChangeText={setEmail} onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)} />
+                                <TextInput style={[signupFormStyles.input, focusedField === 'phone' && signupFocusStyles.focusedInput]} placeholder="Phone number" placeholderTextColor={colors.subtle} keyboardType="phone-pad" value={phone} onChangeText={setPhone} onFocus={() => setFocusedField('phone')} onBlur={() => setFocusedField(null)} />
                                 <PrimaryButton label={submitting ? 'SUBMITTING...' : 'SIGN UP FOR UPDATES'} onPress={submitSignup} />
                                 <Text style={styles.privacyNote}>We will only contact you with Tee Time Nexus updates and launch information.</Text>
                             </>
@@ -205,3 +185,7 @@ export function StayTunedModal({ visible, onClose }: { visible: boolean; onClose
         </Modal>
     );
 }
+
+const signupFocusStyles = StyleSheet.create({
+    focusedInput: { borderColor: colors.primary, borderWidth: 1.5 },
+});

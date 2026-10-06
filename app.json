@@ -9,7 +9,17 @@
     "scheme": "teetimenexus",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.teetimenexus.app"
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.teetimenexus.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      },
+      "entitlements": {
+        "aps-environment": "development"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,13 +29,15 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.teetimenexus.app"
+      "package": "com.teetimenexus.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       "expo-status-bar",
       "@react-native-community/datetimepicker",
       "expo-web-browser",
@@ -33,7 +45,8 @@
         "expo-build-properties",
         {
           "ios": {
-            "enableSceneSupport": true
+            "enableSceneSupport": true,
+            "useFrameworks": "dynamic"
           }
         }
       ],
@@ -43,6 +56,17 @@
           "image": "./assets/teetimenexusspashscreen.png",
           "resizeMode": "cover",
           "enableFullScreenImage_legacy": true
+        }
+      ],
+      "expo-image",
+      "expo-video",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "ttn-updates",
+          "color": "#A1E04C"
         }
       ]
     ]

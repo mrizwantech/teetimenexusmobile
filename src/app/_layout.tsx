@@ -4,15 +4,18 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BottomNav } from '../components/BottomNav';
 import { AuthProvider } from '../context/AuthContext';
+import { PushProvider } from '../context/PushContext';
 import { colors } from '../theme';
 
 export default function Layout() {
   return (
     <AuthProvider>
       <SafeAreaProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-        <BottomNav />
+        <PushProvider>
+          <StatusBar style="light" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+          <BottomNav />
+        </PushProvider>
       </SafeAreaProvider>
     </AuthProvider>
   );

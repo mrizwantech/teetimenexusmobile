@@ -1,0 +1,21 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+/ios
+/android
+.git/
+.DS_Store
+.env
+.env*.local
+*.p8
+*.p12
+*.key
+*.pem
+*.jks
+*.mobileprovision
+*.tsbuildinfo
+# Firebase app configuration files must be included in the build archive.
+!/GoogleService-Info.plist
+!/google-services.json

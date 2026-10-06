@@ -5,6 +5,7 @@ import {
     fetchCurrentUser,
     hasStoredSession,
     login as apiLogin,
+    loginWithApple as apiLoginWithApple,
     logout as apiLogout,
     refreshAccessToken,
     registerAccount as apiRegisterAccount,
@@ -14,6 +15,7 @@ type AuthContextValue = {
     user: AuthUser | null;
     isLoading: boolean;
     login: (username: string, password: string) => Promise<void>;
+    loginWithApple: (identityToken: string, nonce: string, name?: string) => Promise<void>;
     register: (params: { name: string; email: string; password: string; phone?: string; smsOptIn?: boolean; promoOptIn?: boolean }) => Promise<boolean>;
     logout: () => Promise<void>;
 };
@@ -54,6 +56,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
             isLoading,
             login: async (username, password) => {
                 const result = await apiLogin(username, password);
+                if (mountedRef.current) setUser(result.user);
+            },
+            loginWithApple: async (identityToken, nonce, name) => {
+                const result = await apiLoginWithApple({ identityToken, nonce, name });
                 if (mountedRef.current) setUser(result.user);
             },
             register: async (params) => {

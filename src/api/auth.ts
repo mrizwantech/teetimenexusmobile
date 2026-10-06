@@ -16,6 +16,30 @@ export type TokenPair = {
 
 type LoginResponse = TokenPair & { user: AuthUser; welcome_email_sent?: boolean };
 
+export async function loginWithApple(params: {
+    identityToken: string;
+    nonce: string;
+    name?: string;
+}): Promise<LoginResponse> {
+    const response = await fetch(`${API_BASE_URL}/wp-json/ttn/v1/auth/apple`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            identity_token: params.identityToken,
+            nonce: params.nonce,
+            name: params.name?.trim() ?? '',
+        }).toString(),
+    });
+
+    if (!response.ok) {
+        throw new Error(await parseErrorMessage(response));
+    }
+
+    const data = await parseJsonResponse<LoginResponse>(response);
+    await storeTokens(data);
+    return data;
+}
+
 async function parseErrorMessage(response: Response): Promise<string> {
     try {
         const body = await response.json();

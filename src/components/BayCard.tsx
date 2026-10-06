@@ -21,7 +21,7 @@ type BayCardProps = {
 export function BayCard({ bay, index, selected, onPress, fullWidth = false }: BayCardProps) {
     return (
         <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.card, fullWidth && styles.fullWidth, selected && styles.selectedCard]}>
-            <ImageBackground source={{ uri: bayImages[index % bayImages.length] }} imageStyle={styles.image} style={styles.imageFrame}>
+            <ImageBackground source={{ uri: bay.thumbnail_url || bayImages[index % bayImages.length] }} imageStyle={styles.image} style={styles.imageFrame}>
                 <View style={styles.number}><Text style={styles.numberText}>{index + 1}</Text></View>
             </ImageBackground>
             <View style={styles.details}>
