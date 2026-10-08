@@ -20,13 +20,21 @@ export type HomePanel = {
   media_type: 'image' | 'gif' | 'video';
 };
 
+export type ContentPanel = HomePanel & {
+  number?: string;
+  details?: string[];
+  subsections?: { title: string; text: string }[];
+  after?: string;
+  video_url?: string;
+};
+
 export type HomeContent = {
   slides: HomeSlide[];
   section: { title: string; subtitle: string };
   panels: HomePanel[];
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -53,7 +61,7 @@ function isSlide(value: unknown): value is HomeSlide {
     && Array.isArray(value.actions) && value.actions.length > 0 && value.actions.every(isAction);
 }
 
-function isPanel(value: unknown): value is HomePanel {
+export function isPanel(value: unknown): value is HomePanel {
   return isRecord(value) && typeof value.id === 'string' && value.id !== ''
     && typeof value.title === 'string' && typeof value.text === 'string'
     && isMediaUrl(value.media)

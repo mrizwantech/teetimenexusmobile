@@ -4,9 +4,11 @@ import { Link, router, useLocalSearchParams } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 
+import { PASSWORD_POLICY_MESSAGE, passwordMeetsPolicy } from '../api/auth';
 import { BrandMark } from '../components/BrandMark';
 import { PasswordVisibilityIcon } from '../components/PasswordVisibilityIcon';
 import { ProfileScreen } from '../components/ProfileScreen';
+import { PasswordRequirements } from '../components/PasswordRequirements';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
@@ -103,6 +105,10 @@ export default function AccountScreen() {
 
   async function handleRegister() {
     if (!mountedRef.current) return;
+    if (!passwordMeetsPolicy(password)) {
+      setError(PASSWORD_POLICY_MESSAGE);
+      return;
+    }
     setError('');
     setSubmitting(true);
     try {
@@ -194,7 +200,7 @@ export default function AccountScreen() {
         <View style={styles.passwordRow}>
           <TextInput
             style={[styles.input, styles.passwordInput]}
-            placeholder={isRegistering ? 'Password (at least 6 characters)' : 'Password'}
+            placeholder={isRegistering ? 'Password (8+ chars, upper/lowercase, number, symbol)' : 'Password'}
             placeholderTextColor={colors.subtle}
             secureTextEntry={!showPassword}
             value={password}
@@ -209,6 +215,7 @@ export default function AccountScreen() {
             <PasswordVisibilityIcon visible={showPassword} />
           </Pressable>
         </View>
+        {isRegistering ? <PasswordRequirements password={password} /> : null}
         {isRegistering ? <>
           <Pressable style={styles.consentRow} onPress={() => setSmsOptIn((value) => !value)}>
             <View style={[styles.checkbox, smsOptIn && styles.checkboxSelected]}>{smsOptIn ? <Text style={styles.checkboxMark}>✓</Text> : null}</View>

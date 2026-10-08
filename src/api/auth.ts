@@ -16,6 +16,16 @@ export type TokenPair = {
 
 type LoginResponse = TokenPair & { user: AuthUser; welcome_email_sent?: boolean };
 
+export const PASSWORD_POLICY_MESSAGE = 'Use at least 8 characters, including an uppercase letter, a lowercase letter, a number, and a symbol.';
+
+export function passwordMeetsPolicy(password: string): boolean {
+    return password.length >= 8
+        && /[A-Z]/.test(password)
+        && /[a-z]/.test(password)
+        && /[0-9]/.test(password)
+        && /[^A-Za-z0-9\s]/.test(password);
+}
+
 export async function loginWithApple(params: {
     identityToken: string;
     nonce: string;
@@ -86,6 +96,10 @@ export async function registerAccount(params: {
     smsOptIn?: boolean;
     promoOptIn?: boolean;
 }): Promise<LoginResponse> {
+    if (!passwordMeetsPolicy(params.password)) {
+        throw new Error(PASSWORD_POLICY_MESSAGE);
+    }
+
     const response = await fetch(`${API_BASE_URL}/wp-json/ttn/v1/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

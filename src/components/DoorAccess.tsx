@@ -36,7 +36,7 @@ export function DoorAccess({ visible, accessCode = '5327', onClose }: DoorAccess
 
     return (
         <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-            <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+            <SafeAreaView style={styles.screen} edges={['top']}>
                 <ScreenHeader>
                     <Pressable accessibilityRole="button" accessibilityLabel="Close door access" onPress={onClose} style={styles.closeButton}>
                         <Text style={styles.closeText}>‹</Text>

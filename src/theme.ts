@@ -93,10 +93,22 @@ export const bottomNavStyles = StyleSheet.create({
     paddingBottom: spacing.sm,
     paddingTop: spacing.sm,
   },
-  item: { alignItems: 'center', gap: 4, minWidth: 72, paddingVertical: 4 },
+  item: { alignItems: 'center', flex: 1, gap: 4, minHeight: 48, paddingVertical: 4 },
   label: { color: colors.subtle, fontSize: 11, fontWeight: '700' },
   active: { color: colors.primary },
   dot: { backgroundColor: colors.primary, borderRadius: 3, height: 4, width: 4 },
+});
+
+export const menuStyles = StyleSheet.create({
+  label: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  title: { color: colors.heading, fontSize: 28, fontWeight: '900' },
+  list: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, overflow: 'hidden' },
+  item: { alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, flexDirection: 'row', gap: spacing.md, minHeight: 64, padding: spacing.md },
+  pressed: { backgroundColor: colors.surfaceSoft },
+  copy: { flex: 1, gap: 4 },
+  itemTitle: { color: colors.heading, fontSize: 16, fontWeight: '700' },
+  subtitle: { color: colors.muted, fontSize: 12 },
+  arrow: { color: colors.primary, fontSize: 24 },
 });
 
 export const signaturePadStyles = StyleSheet.create({
@@ -134,6 +146,7 @@ export const membershipStyles = StyleSheet.create({
   currentStatus: { color: colors.primaryContrast, fontSize: 13, marginTop: 4, textTransform: 'capitalize' },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, padding: spacing.lg, gap: spacing.sm },
   featuredCard: { borderColor: colors.primary, borderWidth: 2 },
+  thumbnail: { width: '100%', maxWidth: 240, height: 140, alignSelf: 'center', borderRadius: radii.sm, backgroundColor: colors.surfaceStrong },
   featuredLabel: { color: colors.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
   kicker: { color: colors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 1.6 },
   priceRow: { alignItems: 'baseline', flexDirection: 'row' },
@@ -211,6 +224,22 @@ export const homeStyles = StyleSheet.create({
   modalInput: { backgroundColor: colors.surfaceSoft, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.text, fontSize: 15, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
   privacyNote: { color: colors.subtle, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   error: { color: colors.danger, fontSize: 14 },
+});
+
+export const competitionStyles = StyleSheet.create({
+  heading: { color: colors.heading, fontSize: 32, fontWeight: '900', lineHeight: 38 },
+  intro: { color: colors.muted, fontSize: 15, lineHeight: 23 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  filter: { borderColor: colors.borderStrong, borderRadius: radii.pill, borderWidth: 1, minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.md },
+  selectedFilter: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterLabel: { color: colors.text, fontSize: 11, fontWeight: '800' },
+  selectedFilterLabel: { color: colors.primaryContrast },
+  image: { aspectRatio: 16 / 9, backgroundColor: colors.surfaceStrong, borderRadius: radii.sm, width: '100%' },
+  type: { color: colors.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
+  title: { color: colors.heading, fontSize: 22, fontWeight: '900' },
+  date: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  detail: { color: colors.muted, fontSize: 13 },
+  description: { color: colors.muted, fontSize: 14, lineHeight: 21 },
 });
 
 export const bookingStyles = StyleSheet.create({

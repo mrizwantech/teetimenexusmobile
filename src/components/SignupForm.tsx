@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
+import { PASSWORD_POLICY_MESSAGE, passwordMeetsPolicy } from '../api/auth';
 import { PasswordVisibilityIcon } from './PasswordVisibilityIcon';
+import { PasswordRequirements } from './PasswordRequirements';
 import { PrimaryButton } from './PrimaryButton';
 import { SectionCard } from './SectionCard';
 import { useAuth } from '../context/AuthContext';
@@ -35,8 +37,8 @@ export function SignupForm({ returnTo }: SignupFormProps) {
             setError('Passwords do not match.');
             return;
         }
-        if (password.length < 8) {
-            setError('Password must be at least 8 characters.');
+        if (!passwordMeetsPolicy(password)) {
+            setError(PASSWORD_POLICY_MESSAGE);
             return;
         }
 
@@ -67,9 +69,10 @@ export function SignupForm({ returnTo }: SignupFormProps) {
             <TextInput style={[styles.input, focusedField === 'email' && localStyles.focusedInput]} placeholder="Email address" placeholderTextColor={colors.subtle} value={email} onChangeText={setEmail} onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
             <TextInput style={[styles.input, focusedField === 'phone' && localStyles.focusedInput]} placeholder="Phone number" placeholderTextColor={colors.subtle} value={phone} onChangeText={setPhone} onFocus={() => setFocusedField('phone')} onBlur={() => setFocusedField(null)} keyboardType="phone-pad" />
             <View style={localStyles.passwordRow}>
-                <TextInput style={[styles.input, localStyles.passwordInput, focusedField === 'password' && localStyles.focusedInput]} placeholder="Password" placeholderTextColor={colors.subtle} value={password} onChangeText={setPassword} onFocus={() => setFocusedField('password')} onBlur={() => setFocusedField(null)} secureTextEntry={!showPassword} />
+                <TextInput style={[styles.input, localStyles.passwordInput, focusedField === 'password' && localStyles.focusedInput]} placeholder="Password (8+ chars, upper/lowercase, number, symbol)" placeholderTextColor={colors.subtle} value={password} onChangeText={setPassword} onFocus={() => setFocusedField('password')} onBlur={() => setFocusedField(null)} secureTextEntry={!showPassword} />
                 <Text onPress={() => setShowPassword((value) => !value)} style={localStyles.passwordIcon}><PasswordVisibilityIcon visible={showPassword} /></Text>
             </View>
+            <PasswordRequirements password={password} />
             <TextInput style={[styles.input, focusedField === 'confirmPassword' && localStyles.focusedInput]} placeholder="Confirm password" placeholderTextColor={colors.subtle} value={confirmPassword} onChangeText={setConfirmPassword} onFocus={() => setFocusedField('confirmPassword')} onBlur={() => setFocusedField(null)} secureTextEntry={!showPassword} />
             <Pressable style={styles.consentRow} onPress={() => setSmsOptIn((value) => !value)}>
                 <View style={[styles.checkbox, smsOptIn && styles.checkboxSelected]}>{smsOptIn ? <Text style={styles.checkboxMark}>✓</Text> : null}</View>

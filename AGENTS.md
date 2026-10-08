@@ -31,6 +31,14 @@ Run lint and typecheck before declaring any task done.
 
 ## Website home content
 
+### Mobile navigation
+
+- The bottom bar contains Booking, Membership, and a hamburger Menu. Home, account/login, notifications, and signed-in reservations remain accessible from `/menu`.
+- The Menu includes every published primary menu item: Home, Membership, Hours & Access, Experience, Leagues & Tournaments, and About Us. Website-only pages open with `expo-web-browser`; Home, Membership, Experience, and Leagues & Tournaments use native screens. This is a fixed link list, not a live WordPress menu feed; update `src/navigation/menu.ts` if website navigation changes.
+- Menu, booking review, and reservation details link to the website booking page's Terms and Conditions control for the current booking, cancellation, and refund policy. The website currently exposes the terms in a modal, so users must tap that control after opening the link. No separate policy text or refund calculations are maintained in mobile. Mobile cancellation/rescheduling still requires support; this does not implement the website's self-service cancellation flow.
+- Bottom navigation respects the bottom safe area, including the door-access modal. Run `node --test tests/navigation-menu.test.mjs` to verify destinations and guest/member menu visibility.
+- The mobile Hours link is titled "24/7 Hours & Access", matching the heading in the theme's `page-hours.php` (deploy that template for the website heading update). Member access remains 24/7; public hours remain 10 AM to 10 PM.
+
 - The guest home page loads `GET /wp-json/ttn/v1/home` from `EXPO_PUBLIC_API_URL` (default: `https://teetimenexus.com`) on each focus. The signed-in dashboard is unchanged.
 - The WordPress theme's `inc/home-content.php` shares the three slide and six technology-panel settings/defaults with `front-page.php`. Deploy that file, `functions.php`, and `front-page.php` together to the active `golf-simulator-theme` before releasing the mobile update.
 - Edit images, media URLs, titles, and descriptions in the existing WordPress Customizer. No mobile release is needed for content updates. The feed includes native booking/membership routes for the website's two hero actions.
@@ -40,7 +48,27 @@ Run lint and typecheck before declaring any task done.
 - Run content contract tests with `node --test tests/home-content.test.mjs`.
 - In the theme directory, run `php tests/home-content.php` to verify setting overrides, media classification, the public route, and guest-page rendering without a WordPress database.
 
+### Native technology content
+
+- Experience opens `/technology`, not the website or a WebView. It loads public `GET /wp-json/ttn/v1/technology` on focus and uses the shared HomePanels media/card component in a two-column grid, with full details and no website navigation/booking CTA buttons.
+- Deploy the theme's `functions.php`, `inc/golf-technology-content.php`, and `inc/mobile-technology-api.php` together. The endpoint uses the same 13 sections and saved feature attachments as the website, including legacy media aliases. Without deployment, the app shows an explicit error/retry instead of fabricated content.
+- Uploaded images/GIFs/direct video files use the existing native media behavior. Sections without uploaded media use a YouTube thumbnail; tapping it opens the video in an in-app browser, not a native video player. Website YouTube iframe embeds are not copied.
+- Run `node --test tests/technology-content.test.mjs tests/navigation-menu.test.mjs tests/home-content.test.mjs` and theme `php tests/mobile-technology-content.php` for content and routing regression coverage.
+
+### Competition browsing
+
+- Leagues & Tournaments opens the native `/competitions` screen. It fetches public `GET /wp-json/ttn/v1/competitions?limit=50` from `EXPO_PUBLIC_API_URL`, validates the response, and opens each event's website detail page in the system browser. Registration and payments are not implemented in this release.
+- Deploy and activate `wp-content/plugins/tee-time-nexus-competitions` before releasing the app screen. Registration is web-based: players sign in to the site and complete paid registration through the existing WooCommerce checkout; the mobile app does not collect card details. In WordPress, use Golf Competitions > Create Missing Listing Pages, then add those pages to the primary menu if desired. Create and publish competitions with a future start date and a League or Tournament type.
+- Feed failures and malformed responses show a retryable error instead of placeholder events. Run `node --test tests/competitions-content.test.mjs tests/navigation-menu.test.mjs` for feed and navigation contract coverage.
+
 ## Building with EAS
+
+### Membership browsing and checkout
+
+- Membership cards load from `/wp-json/ttn/v1/membership/packages`; no login or account form is required to browse. Guests enter account details in a bottom sheet only after choosing a package, then proceed through the existing guest checkout API. Signed-in checkout is unchanged.
+- The feed includes optional `thumbnail_url`, resolving the matching published package's Package Thumbnail first, then its default-tier thumbnail. Deploy the theme's `inc/mobile-membership-api.php` for thumbnails to appear; older responses without the field remain supported. Pricing/features still use the existing WordPress default-tier settings.
+- Membership thumbnails show the entire image without cropping in a centered, compact frame (up to 240 wide and 140 high), preserving the source aspect ratio.
+- Run `php tests/mobile-membership-packages.php` in the theme directory to check thumbnail precedence, missing-image behavior, and package response compatibility.
 
 ### Firebase push notifications (iOS and Android)
 

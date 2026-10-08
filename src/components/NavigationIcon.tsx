@@ -3,13 +3,17 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { colors } from '../theme';
 
 type NavigationIconProps = {
-    name: 'home' | 'book' | 'reservations' | 'membership' | 'profile';
+    name: 'home' | 'book' | 'reservations' | 'membership' | 'profile' | 'menu';
     active?: boolean;
 };
 
 export function NavigationIcon({ name, active = false }: NavigationIconProps) {
     const color = active ? colors.primary : colors.subtle;
     const common = { stroke: color, strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+    if (name === 'menu') {
+        return <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Path d="M4 6h16M4 12h16M4 18h16" {...common} /></Svg>;
+    }
 
     if (name === 'home') {
         return <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" {...common} /><Path d="M9 21v-7h6v7" {...common} /></Svg>;

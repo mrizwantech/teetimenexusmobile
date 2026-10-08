@@ -11,6 +11,7 @@ import { BayCard } from '../components/BayCard';
 import { BayTypeCard } from '../components/BayTypeCard';
 import { BookingAuthGate } from '../components/BookingAuthGate';
 import { BookingProgress } from '../components/BookingProgress';
+import { BookingPolicyLink } from '../components/BookingPolicyLink';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
@@ -426,6 +427,7 @@ export default function BookScreen() {
                 </>
               )}
 
+              <BookingPolicyLink />
               <PrimaryButton
                 label={continuing ? 'Please wait…' : 'Continue to payment'}
                 onPress={handleContinue}

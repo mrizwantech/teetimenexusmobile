@@ -8,6 +8,7 @@ export type MembershipPackage = {
     billing: string;
     featured: boolean;
     features: string[];
+    thumbnail_url?: string | null;
 };
 
 export type MembershipRecord = {

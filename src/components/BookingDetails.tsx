@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { openAppleCalendar, openGoogleCalendar } from './CalendarCard';
 import { BayCard } from './BayCard';
 import { BookingActionIcon } from './BookingActionIcon';
+import { BookingPolicyLink } from './BookingPolicyLink';
 import { DoorAccess } from './DoorAccess';
 import { PrimaryButton } from './PrimaryButton';
 import { ScreenHeader } from './Screen';
@@ -112,6 +113,7 @@ export function BookingDetails({ bay, date, time, duration, players, bayIndex = 
             <Pressable accessibilityRole="button" onPress={() => Alert.alert('Cancel or reschedule', 'Please contact Tee Time Nexus support to change this reservation.')}>
                 <Text style={styles.cancel}>Cancel / Reschedule</Text>
             </Pressable>
+            <BookingPolicyLink />
 
             <DoorAccess visible={doorAccessVisible} onClose={() => setDoorAccessVisible(false)} />
         </>
