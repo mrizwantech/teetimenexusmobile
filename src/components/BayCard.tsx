@@ -22,32 +22,35 @@ export function BayCard({ bay, index, selected, onPress, fullWidth = false }: Ba
     return (
         <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.card, fullWidth && styles.fullWidth, selected && styles.selectedCard]}>
             <ImageBackground source={{ uri: bay.thumbnail_url || bayImages[index % bayImages.length] }} imageStyle={styles.image} style={styles.imageFrame}>
-                <View style={styles.number}><Text style={styles.numberText}>{index + 1}</Text></View>
-            </ImageBackground>
-            <View style={styles.details}>
-                <Text numberOfLines={1} style={styles.name}>{bay.name}</Text>
-                <Text style={styles.location}>{bay.location}</Text>
-                <View style={styles.statusRow}>
-                    <View style={styles.statusDot} />
-                    <Text style={styles.status}>Available</Text>
+                <View style={styles.overlay}>
+                    <View style={styles.number}><Text style={styles.numberText}>{index + 1}</Text></View>
+                    <View style={styles.details}>
+                        <Text style={styles.name}>{bay.name}</Text>
+                        <Text style={styles.location}>{bay.location}</Text>
+                        <View style={styles.statusRow}>
+                            <View style={styles.statusDot} />
+                            <Text style={styles.status}>Available</Text>
+                        </View>
+                    </View>
                 </View>
-            </View>
+            </ImageBackground>
         </Pressable>
     );
 }
 
 const styles = StyleSheet.create({
-    card: { backgroundColor: colors.surface, borderColor: colors.borderStrong, borderRadius: radii.md, borderWidth: 1, flexBasis: '48%', flexGrow: 0, flexShrink: 0, overflow: 'hidden' },
-    fullWidth: { alignSelf: 'stretch', flexBasis: '100%' },
+    card: { backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.md, borderWidth: 1, flexBasis: '48%', flexGrow: 0, flexShrink: 0, overflow: 'hidden' },
+    fullWidth: { alignSelf: 'stretch', width: '100%', flexBasis: 'auto' },
     selectedCard: { borderColor: colors.primary, borderWidth: 2 },
-    imageFrame: { height: 104, justifyContent: 'flex-start' },
-    image: { borderTopLeftRadius: radii.md, borderTopRightRadius: radii.md },
-    number: { alignItems: 'center', backgroundColor: colors.heading, borderRadius: 10, height: 20, justifyContent: 'center', margin: spacing.xs, width: 20 },
-    numberText: { color: colors.primaryContrast, fontSize: 11, fontWeight: '900' },
-    details: { gap: 3, padding: spacing.sm },
-    name: { color: colors.heading, fontSize: 15, fontWeight: '800' },
-    location: { color: colors.muted, fontSize: 10 },
+    imageFrame: { width: '100%', minHeight: 140 },
+    overlay: { flex: 1, minHeight: 140, backgroundColor: 'rgba(0, 0, 0, 0.65)', flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+    image: { borderRadius: radii.md },
+    number: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 999, minHeight: 32, justifyContent: 'center', minWidth: 32, padding: spacing.xs },
+    numberText: { color: colors.primaryContrast, fontSize: 14, fontWeight: '900' },
+    details: { flex: 1, gap: spacing.xs },
+    name: { color: colors.heading, fontSize: 16, lineHeight: 22, fontWeight: '800' },
+    location: { color: colors.muted, fontSize: 14, lineHeight: 20 },
     statusRow: { alignItems: 'center', flexDirection: 'row', gap: 4, marginTop: 2 },
     statusDot: { backgroundColor: colors.primary, borderRadius: 4, height: 7, width: 7 },
-    status: { color: colors.primary, fontSize: 10, fontWeight: '800' },
+    status: { color: colors.primary, fontSize: 14, fontWeight: '800' },
 });

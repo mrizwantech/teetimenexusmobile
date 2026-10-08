@@ -1,11 +1,10 @@
-import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Bay, getAvailability, getBays, getTimeSlots, TimeSlot } from '../api/booking';
+import { Bay, getAvailability, getBays, getBookingOptions, TimeSlot } from '../api/booking';
+import { BookingOptions, isBookingDateAllowed } from '../api/booking-rules';
 import { startCheckout } from '../api/checkout';
-import { getVerificationStatus, submitVerification } from '../api/verification';
 import { BrandMark } from '../components/BrandMark';
 import { BayCard } from '../components/BayCard';
 import { BayTypeCard } from '../components/BayTypeCard';
@@ -15,7 +14,6 @@ import { BookingPolicyLink } from '../components/BookingPolicyLink';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
-import { SignaturePad, SignaturePadHandle } from '../components/SignaturePad';
 import { useAuth } from '../context/AuthContext';
 import { bookingStyles as styles } from '../theme';
 
@@ -35,9 +33,12 @@ function isBayVisibleForType(bay: Bay, bayType: BayType): boolean {
 export default function BookScreen() {
   const { user } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
+  const optionsRequestId = useRef(0);
   const [bays, setBays] = useState<Bay[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loadError, setLoadError] = useState('');
+  const [bookingOptions, setBookingOptions] = useState<BookingOptions | null>(null);
+  const [loadingOptions, setLoadingOptions] = useState(true);
   const [continuing, setContinuing] = useState(false);
 
   const [bayType, setBayType] = useState<BayType | null>(null);
@@ -51,41 +52,36 @@ export default function BookScreen() {
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
 
-  const signatureRef = useRef<SignaturePadHandle>(null);
-  const [alreadyVerified, setAlreadyVerified] = useState(false);
-  const [idImage, setIdImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
-  const [hasSignature, setHasSignature] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-
-  useEffect(() => {
+  const loadBookingOptions = useCallback(async () => {
     if (!user) return;
-    let cancelled = false;
-
-    getVerificationStatus()
-      .then((result) => {
-        if (!cancelled) setAlreadyVerified(result.verified);
-      })
-      .catch(() => {
-        if (!cancelled) setAlreadyVerified(false);
+    const requestId = ++optionsRequestId.current;
+    setLoadingOptions(true);
+    setLoadError('');
+    setBookingOptions(null);
+    try {
+      const [bayList, options] = await Promise.all([getBays(), getBookingOptions()]);
+      if (requestId !== optionsRequestId.current) return;
+      setBays(bayList);
+      setTimeSlots(options.slots);
+      setBookingOptions(options);
+      setDate((previous) => previous && isBookingDateAllowed(formatDate(previous), options) ? previous : null);
+      setCalendarMonth((previous) => {
+        const month = formatDate(previous).slice(0, 7);
+        if (month >= options.min_booking_date.slice(0, 7) && month <= options.max_booking_date.slice(0, 7)) return previous;
+        const [year, monthNumber] = options.min_booking_date.split('-').map(Number);
+        return new Date(year, monthNumber - 1, 1);
       });
-
-    return () => {
-      cancelled = true;
-    };
+    } catch (error) {
+      if (requestId === optionsRequestId.current) setLoadError(error instanceof Error ? error.message : 'Unable to load booking options. Please try again.');
+    } finally {
+      if (requestId === optionsRequestId.current) setLoadingOptions(false);
+    }
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        const [bayList, slots] = await Promise.all([getBays(), getTimeSlots()]);
-        setBays(bayList);
-        setTimeSlots(slots);
-      } catch {
-        setLoadError('Unable to load booking options. Please check your connection and try again.');
-      }
-    })();
-  }, [user]);
+  useFocusEffect(useCallback(() => {
+    void loadBookingOptions();
+    return () => { optionsRequestId.current += 1; };
+  }, [loadBookingOptions]));
 
   const selectedBay = useMemo(() => bays.find((bay) => bay.key === bayKey) ?? null, [bays, bayKey]);
   const visibleBays = useMemo(() => (bayType ? bays.filter((bay) => isBayVisibleForType(bay, bayType)) : []), [bays, bayType]);
@@ -163,17 +159,16 @@ export default function BookScreen() {
   }
 
   const totalPrice = selectedBay && duration ? selectedBay.hourly_price * duration : 0;
-  const selectionsComplete = Boolean(selectedBay && date && duration && players && time);
-  const verificationComplete = !user || alreadyVerified || Boolean(idImage && hasSignature && termsAccepted);
-  const readyToContinue = selectionsComplete && verificationComplete;
+  const selectionsComplete = Boolean(selectedBay && date && bookingOptions && isBookingDateAllowed(formatDate(date), bookingOptions) && duration && players && time);
+  const readyToContinue = selectionsComplete;
   const bookingProgress = [
     Boolean(bayType),
     Boolean(selectedBay),
     Boolean(date),
-    Boolean(duration),
-    Boolean(players),
-    Boolean(time),
-    verificationComplete,
+    Boolean(date && duration),
+    Boolean(date && players),
+    Boolean(date && time),
+    selectionsComplete,
   ];
 
   function scrollToLatestStep() {
@@ -181,25 +176,16 @@ export default function BookScreen() {
   }
 
   function selectDate(nextDate: Date) {
+    if (!bookingOptions || !isBookingDateAllowed(formatDate(nextDate), bookingOptions)) {
+      Alert.alert('Date unavailable', 'Please choose a date within your booking window.');
+      return;
+    }
     setDate(nextDate);
     setDuration(null);
     setPlayers(null);
     setTime(null);
     setCurrentStep(3);
     scrollToLatestStep();
-  }
-
-  async function pickIdDocument() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission needed', 'Photo library access is required to upload your ID.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      setIdImage(result.assets[0]);
-    }
   }
 
   function handleBayTypeSelect(nextType: BayType) {
@@ -219,25 +205,13 @@ export default function BookScreen() {
 
   async function handleContinue() {
     if (!selectedBay || !date || !duration || !players || !time) return;
+    if (!bookingOptions || !isBookingDateAllowed(formatDate(date), bookingOptions)) {
+      Alert.alert('Date unavailable', 'Please choose a date within your booking window.');
+      return;
+    }
 
     setContinuing(true);
     try {
-      if (user && !alreadyVerified) {
-        if (!idImage || !signatureRef.current?.hasSignature()) {
-          Alert.alert('Verification incomplete', 'Please upload your ID and sign before continuing.');
-          return;
-        }
-
-        const signatureDataUrl = await signatureRef.current.capture();
-        await submitVerification({
-          idDocumentUri: idImage.uri,
-          idDocumentName: idImage.fileName ?? 'id-document.jpg',
-          idDocumentType: idImage.mimeType ?? 'image/jpeg',
-          signatureDataUrl,
-        });
-        setAlreadyVerified(true);
-      }
-
       const { bridge_url } = await startCheckout({
         bay: selectedBay.name,
         date: formatDate(date),
@@ -274,25 +248,25 @@ export default function BookScreen() {
         <BookingProgress completed={bookingProgress} activeIndex={currentStep} onStepPress={setCurrentStep} />
 
         <Text style={styles.title}>Book your session</Text>
-        <Text style={styles.body}>Select your bay type, choose a bay, pick your date and time, then proceed to payment.</Text>
 
         {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
+        {loadError ? <PrimaryButton label="Retry booking options" onPress={() => void loadBookingOptions()} /> : null}
+        {loadingOptions ? <Text style={styles.hint}>Loading booking options...</Text> : null}
 
-        <SectionCard>
+        {bookingOptions && !loadingOptions ? <SectionCard>
           {currentStep === 0 ? (
             <>
-              <Text style={styles.sectionHeading}>Choose your bay type</Text>
-              <Text style={styles.hint}>Select the setup that matches your swing.</Text>
+              <Text style={styles.setupHeading}>Select a bay that matches your swing</Text>
               <View style={styles.bayGrid}>
                 <BayTypeCard
-                  label="Right handed"
-                  image="https://images.unsplash.com/photo-1593111774278-0b6b02b7961c?auto=format&fit=crop&w=900&q=85"
+                  label="Right-Handed"
+                  description="For right-handed golfers only"
                   selected={bayType === 'right-handed'}
                   onPress={() => handleBayTypeSelect('right-handed')}
                 />
                 <BayTypeCard
-                  label="Left handed"
-                  image="https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?auto=format&fit=crop&w=900&q=85"
+                  label="Dual-Handed"
+                  description="Play both left- and right-handed"
                   selected={bayType === 'left-handed'}
                   onPress={() => handleBayTypeSelect('left-handed')}
                 />
@@ -303,12 +277,13 @@ export default function BookScreen() {
           {currentStep === 1 ? (
             <>
               <Text style={styles.sectionHeading}>Choose your bay</Text>
-              <View style={styles.bayGrid}>
+              <View style={styles.bayList}>
                 {visibleBays.map((bay, index) => (
                   <BayCard
                     key={bay.key}
                     bay={bay}
                     index={index}
+                    fullWidth
                     selected={bayKey === bay.key}
                     onPress={() => {
                       setBayKey(bay.key);
@@ -326,7 +301,8 @@ export default function BookScreen() {
           {currentStep === 2 ? (
             <>
               <Text style={styles.sectionHeading}>Choose a date</Text>
-              <InlineCalendar month={calendarMonth} selectedDate={date} onMonthChange={setCalendarMonth} onSelectDate={selectDate} />
+              <Text style={styles.hint}>You can book up to {bookingOptions.booking_window_days} days ahead.</Text>
+              <InlineCalendar month={calendarMonth} selectedDate={date} bookingOptions={bookingOptions} onMonthChange={setCalendarMonth} onSelectDate={selectDate} />
             </>
           ) : null}
 
@@ -398,34 +374,7 @@ export default function BookScreen() {
                 <Text style={styles.summaryTotal}>Total: ${totalPrice}</Text>
               </Text>
 
-              <Text style={styles.sectionHeading}>Verify your reservation</Text>
-              {!user ? (
-                <Text style={styles.verifiedNote}>Guest checkout is available. Your contact and payment details will be collected securely on the next screen.</Text>
-              ) : alreadyVerified ? (
-                <Text style={styles.verifiedNote}>✓ Using the ID, signature, and terms already on file for your account.</Text>
-              ) : (
-                <>
-                  <Text style={styles.label}>Upload a photo of your government-issued ID</Text>
-                  {idImage ? <Image source={{ uri: idImage.uri }} style={styles.idPreview} resizeMode="cover" /> : null}
-                  <Pressable style={styles.uploadButton} onPress={pickIdDocument}>
-                    <Text style={styles.uploadButtonText}>{idImage ? 'Change photo' : 'Choose photo'}</Text>
-                  </Pressable>
-                  <Text style={styles.hint}>JPG or PNG, up to 8MB. Stored encrypted and only viewable by our staff.</Text>
-
-                  <Text style={[styles.label, styles.labelSpacer]}>Sign to confirm your reservation</Text>
-                  <SignaturePad ref={signatureRef} onChange={setHasSignature} />
-                  <Pressable style={styles.clearButton} onPress={() => { signatureRef.current?.clear(); setHasSignature(false); }}>
-                    <Text style={styles.clearButtonText}>Clear signature</Text>
-                  </Pressable>
-
-                  <Pressable style={styles.termsRow} onPress={() => setTermsAccepted((prev) => !prev)}>
-                    <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
-                      {termsAccepted ? <Text style={styles.checkboxMark}>✓</Text> : null}
-                    </View>
-                    <Text style={styles.termsText}>I have read and agree to the Terms and Conditions.</Text>
-                  </Pressable>
-                </>
-              )}
+              <Text style={styles.sectionHeading}>Review your reservation</Text>
 
               <BookingPolicyLink />
               <PrimaryButton
@@ -437,7 +386,7 @@ export default function BookScreen() {
           ) : null}
 
           {currentStep > 0 ? <PrimaryButton label="Back" onPress={goBack} secondary /> : null}
-        </SectionCard>
+        </SectionCard> : null}
       </> : null}
     </Screen>
   );
@@ -446,15 +395,16 @@ export default function BookScreen() {
 function InlineCalendar({
   month,
   selectedDate,
+  bookingOptions,
   onMonthChange,
   onSelectDate,
 }: {
   month: Date;
   selectedDate: Date | null;
+  bookingOptions: BookingOptions;
   onMonthChange: (month: Date) => void;
   onSelectDate: (date: Date) => void;
 }) {
-  const today = new Date();
   const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const leadingDays = (firstDay.getDay() + 6) % 7;
@@ -462,7 +412,9 @@ function InlineCalendar({
     if (index < leadingDays) return null;
     return new Date(month.getFullYear(), month.getMonth(), index - leadingDays + 1);
   });
-  const canGoPrevious = month.getFullYear() > today.getFullYear() || month.getMonth() > today.getMonth();
+  const monthKey = formatDate(month).slice(0, 7);
+  const canGoPrevious = monthKey > bookingOptions.min_booking_date.slice(0, 7);
+  const canGoNext = monthKey < bookingOptions.max_booking_date.slice(0, 7);
 
   return (
     <View style={styles.calendar}>
@@ -480,8 +432,9 @@ function InlineCalendar({
         <Pressable
           accessibilityLabel="Next month"
           accessibilityRole="button"
+          disabled={!canGoNext}
           onPress={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-          style={styles.monthButton}
+          style={[styles.monthButton, !canGoNext && styles.monthButtonDisabled]}
         >
           <Text style={styles.monthButtonText}>›</Text>
         </Pressable>
@@ -492,18 +445,18 @@ function InlineCalendar({
       <View style={styles.calendarGrid}>
         {days.map((day, index) => {
           if (!day) return <View key={`empty-${index}`} style={styles.dayCell} />;
-          const isPast = formatDate(day) < formatDate(today);
+          const isUnavailable = !isBookingDateAllowed(formatDate(day), bookingOptions);
           const isSelected = selectedDate && formatDate(selectedDate) === formatDate(day);
           return (
             <Pressable
               key={formatDate(day)}
               accessibilityRole="button"
-              accessibilityState={{ disabled: isPast, selected: Boolean(isSelected) }}
-              disabled={isPast}
+              accessibilityState={{ disabled: isUnavailable, selected: Boolean(isSelected) }}
+              disabled={isUnavailable}
               onPress={() => onSelectDate(day)}
-              style={[styles.dayCell, isSelected && styles.selectedDay, isPast && styles.pastDay]}
+              style={[styles.dayCell, isSelected && styles.selectedDay, isUnavailable && styles.pastDay]}
             >
-              <Text style={[styles.dayText, isSelected && styles.selectedDayText, isPast && styles.pastDayText]}>{day.getDate()}</Text>
+              <Text style={[styles.dayText, isSelected && styles.selectedDayText, isUnavailable && styles.pastDayText]}>{day.getDate()}</Text>
             </Pressable>
           );
         })}

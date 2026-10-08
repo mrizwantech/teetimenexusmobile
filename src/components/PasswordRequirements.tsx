@@ -31,6 +31,6 @@ const styles = StyleSheet.create({
     row: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs },
     check: { color: colors.muted, fontSize: 14, fontWeight: '800', width: 18 },
     checkMet: { color: colors.primary },
-    label: { color: colors.muted, fontSize: 12 },
+    label: { color: colors.muted, fontSize: 14 },
     labelMet: { color: colors.text },
 });

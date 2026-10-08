@@ -30,5 +30,5 @@ export function BookingPolicyLink() {
 const styles = StyleSheet.create({
   link: { gap: spacing.xs, minHeight: 48, paddingVertical: spacing.sm },
   title: { color: colors.primary, fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
-  hint: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  hint: { color: colors.muted, fontSize: 14, lineHeight: 20 },
 });

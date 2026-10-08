@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Alert, Image, Pressable, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -60,6 +60,7 @@ function CompetitionCard({ event }: { event: Competition }) {
 }
 
 export default function CompetitionsScreen() {
+  const { type } = useLocalSearchParams<{ type?: string }>();
   const [items, setItems] = useState<Competition[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [error, setError] = useState('');
@@ -67,11 +68,11 @@ export default function CompetitionsScreen() {
   const requestIdRef = useRef(0);
   const visibleItems = items.filter((item) => filter === 'all' || item.type === filter);
 
-  const loadCompetitions = useCallback(() => {
+  const loadCompetitions = useCallback((forceRefresh = false) => {
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError('');
-    getCompetitions()
+    getCompetitions(forceRefresh)
       .then((result) => { if (requestIdRef.current === requestId) setItems(result.items); })
       .catch((err: unknown) => {
         if (requestIdRef.current === requestId) setError(err instanceof Error ? err.message : 'Unable to load competitions.');
@@ -80,9 +81,10 @@ export default function CompetitionsScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => {
+    setFilter(type === 'league' || type === 'tournament' ? type : 'all');
     loadCompetitions();
     return () => { requestIdRef.current += 1; };
-  }, [loadCompetitions]));
+  }, [loadCompetitions, type]));
 
   return (
     <Screen>
@@ -111,7 +113,7 @@ export default function CompetitionsScreen() {
         <Text style={homeStyles.cardTitle}>Competitions unavailable</Text>
         <Text style={homeStyles.error}>{error}</Text>
         {items.length ? <Text style={homeStyles.body}>Showing previously loaded events.</Text> : null}
-        <PrimaryButton label="TRY AGAIN" onPress={loadCompetitions} disabled={loading} />
+        <PrimaryButton label="TRY AGAIN" onPress={() => loadCompetitions(true)} disabled={loading} />
       </SectionCard> : null}
       {!loading && !error && visibleItems.length === 0 ? (
         <SectionCard>

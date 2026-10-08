@@ -1,31 +1,27 @@
-import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { colors, radii, spacing } from '../theme';
 
 type BayTypeCardProps = {
     label: string;
-    image: string;
+    description: string;
     selected: boolean;
     onPress: () => void;
 };
 
-export function BayTypeCard({ label, image, selected, onPress }: BayTypeCardProps) {
+export function BayTypeCard({ label, description, selected, onPress }: BayTypeCardProps) {
     return (
-        <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.card, selected && styles.selectedCard]}>
-            <ImageBackground source={{ uri: image }} imageStyle={styles.image} style={styles.imageFrame}>
-                <View style={styles.check}><Text style={styles.checkText}>{selected ? '✓' : ''}</Text></View>
-            </ImageBackground>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${label}. ${description}`} accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.card, selected && styles.selectedCard, pressed && styles.pressed]}>
             <Text style={styles.label}>{label}</Text>
+            <Text style={styles.description}>{description}</Text>
         </Pressable>
     );
 }
 
 const styles = StyleSheet.create({
-    card: { backgroundColor: colors.surface, borderColor: colors.borderStrong, borderRadius: radii.md, borderWidth: 1, flex: 1, overflow: 'hidden' },
-    selectedCard: { borderColor: colors.primary, borderWidth: 2 },
-    imageFrame: { height: 120, justifyContent: 'flex-end' },
-    image: { borderTopLeftRadius: radii.md, borderTopRightRadius: radii.md },
-    check: { alignItems: 'center', alignSelf: 'flex-end', backgroundColor: colors.surfaceStrong, borderColor: colors.borderStrong, borderRadius: 10, borderWidth: 1, height: 20, justifyContent: 'center', margin: spacing.xs, width: 20 },
-    checkText: { color: colors.primary, fontSize: 13, fontWeight: '900' },
-    label: { color: colors.heading, fontSize: 14, fontWeight: '800', padding: spacing.sm },
+    card: { backgroundColor: colors.surface, borderColor: colors.primary, borderRadius: radii.md, borderWidth: 1, flex: 1, minHeight: 116, padding: spacing.md, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    selectedCard: { backgroundColor: colors.surfaceStrong },
+    pressed: { backgroundColor: colors.surfaceSoft },
+    label: { color: colors.primary, fontSize: 16, lineHeight: 22, fontWeight: '700', textAlign: 'center' },
+    description: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
 });

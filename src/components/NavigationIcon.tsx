@@ -3,13 +3,29 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { colors } from '../theme';
 
 type NavigationIconProps = {
-    name: 'home' | 'book' | 'reservations' | 'membership' | 'profile' | 'menu';
+    name: 'home' | 'book' | 'reservations' | 'membership' | 'profile' | 'menu' | 'league' | 'tournament' | 'features' | 'contact';
     active?: boolean;
 };
 
 export function NavigationIcon({ name, active = false }: NavigationIconProps) {
     const color = active ? colors.primary : colors.subtle;
     const common = { stroke: color, strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+    if (name === 'league') {
+        return <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Path d="M5 21V3l14 4-14 4" {...common} /></Svg>;
+    }
+
+    if (name === 'tournament') {
+        return <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Path d="M7 3h10v6a5 5 0 0 1-10 0V3ZM7 5H3v3a4 4 0 0 0 4 4M17 5h4v3a4 4 0 0 1-4 4M12 14v7M8 21h8" {...common} /></Svg>;
+    }
+
+    if (name === 'features') {
+        return <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Rect x="3" y="12" width="4" height="9" rx="1" {...common} /><Rect x="10" y="3" width="4" height="18" rx="1" {...common} /><Rect x="17" y="8" width="4" height="13" rx="1" {...common} /></Svg>;
+    }
+
+    if (name === 'contact') {
+        return <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Rect x="3" y="5" width="18" height="14" rx="2" {...common} /><Path d="m3 6 9 7 9-7" {...common} /></Svg>;
+    }
 
     if (name === 'menu') {
         return <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Path d="M4 6h16M4 12h16M4 18h16" {...common} /></Svg>;

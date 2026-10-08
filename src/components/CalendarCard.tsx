@@ -23,7 +23,7 @@ function formatGoogleDate(date: Date): string {
 export function CalendarCard({ bay, date, time, duration, players }: CalendarCardProps) {
     return (
         <View style={styles.card}>
-            <Text style={styles.title}>Add to Calendar</Text>
+            want             <Text style={styles.title}>Add to Calendar</Text>
             <Text style={styles.subtitle}>{bay} · {date} at {time}</Text>
             <View style={styles.actions}>
                 {Platform.OS === 'ios' ? (
@@ -61,9 +61,9 @@ export function openAppleCalendar(date: string, time: string) {
 const styles = StyleSheet.create({
     card: { backgroundColor: colors.surface, borderColor: colors.borderStrong, borderRadius: radii.md, borderWidth: 1, gap: spacing.sm, padding: spacing.md },
     title: { color: colors.heading, fontSize: 14, fontWeight: '800' },
-    subtitle: { color: colors.muted, fontSize: 12 },
+    subtitle: { color: colors.muted, fontSize: 14 },
     actions: { flexDirection: 'row', gap: spacing.sm },
-    action: { alignItems: 'center', backgroundColor: colors.surfaceSoft, borderColor: colors.border, borderRadius: radii.sm, borderWidth: 1, flex: 1, flexDirection: 'row', gap: spacing.xs, minHeight: 42, paddingHorizontal: spacing.sm },
+    action: { alignItems: 'center', backgroundColor: colors.surfaceSoft, borderColor: colors.border, borderRadius: radii.sm, borderWidth: 1, flex: 1, flexDirection: 'row', gap: spacing.xs, minHeight: 44, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm },
     icon: { color: colors.primary, fontSize: 17 },
-    actionText: { color: colors.text, flexShrink: 1, fontSize: 11, fontWeight: '700' },
+    actionText: { color: colors.text, flexShrink: 1, fontSize: 14, fontWeight: '700' },
 });

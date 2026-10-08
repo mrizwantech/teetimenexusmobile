@@ -6,11 +6,13 @@ import { BrandMark } from '../components/BrandMark';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
+import { useAuth } from '../context/AuthContext';
 import { usePush } from '../context/PushContext';
 import { pushUnavailableReason } from '../notifications/push';
 import { accountStyles as styles, colors } from '../theme';
 
 export default function NotificationsScreen() {
+  const { user } = useAuth();
   const { permission, token, notice, loading, error, refresh } = usePush();
   const [settingsError, setSettingsError] = useState('');
   const [showToken, setShowToken] = useState(false);
@@ -26,7 +28,7 @@ export default function NotificationsScreen() {
 
   return (
     <Screen>
-      <ScreenHeader><BrandMark /><Link href="/account"><Text style={{ color: colors.primary }}>Back to profile</Text></Link></ScreenHeader>
+      <ScreenHeader><BrandMark /><Link href={user ? '/settings' : '/account'}><Text style={{ color: colors.primary }}>{user ? 'Back to settings' : 'Back to account'}</Text></Link></ScreenHeader>
       <Text style={styles.title}>Notifications</Text>
       <SectionCard>
         <Text style={styles.cardTitle}>Stay connected</Text>
@@ -41,6 +43,9 @@ export default function NotificationsScreen() {
             onPress={() => { if (permission === 'denied') void openSettings(); else void refresh(permission === 'not-determined'); }}
           />
         )}
+        {permission !== 'unsupported' && permission !== 'denied' ? (
+          <PrimaryButton secondary label="OPEN DEVICE SETTINGS" onPress={() => void openSettings()} />
+        ) : null}
       </SectionCard>
       {token ? (
         <SectionCard>

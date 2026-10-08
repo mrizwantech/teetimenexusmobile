@@ -6,6 +6,7 @@ import * as Crypto from 'expo-crypto';
 
 import { PASSWORD_POLICY_MESSAGE, passwordMeetsPolicy } from '../api/auth';
 import { BrandMark } from '../components/BrandMark';
+import { ForgotPasswordLink } from '../components/ForgotPasswordLink';
 import { PasswordVisibilityIcon } from '../components/PasswordVisibilityIcon';
 import { ProfileScreen } from '../components/ProfileScreen';
 import { PasswordRequirements } from '../components/PasswordRequirements';
@@ -93,7 +94,7 @@ export default function AccountScreen() {
       const name = credential.fullName
         ? AppleAuthentication.formatFullName(credential.fullName).trim()
         : undefined;
-      await loginWithApple(credential.identityToken, nonce, name || undefined);
+      await loginWithApple(credential.identityToken, nonce, name || undefined, credential.fullName?.givenName ?? undefined, credential.fullName?.familyName ?? undefined);
       if (mountedRef.current && returnTo === '/book') router.replace('/book');
     } catch (err) {
       if (err && typeof err === 'object' && 'code' in err && err.code === 'ERR_REQUEST_CANCELED') return;
@@ -215,6 +216,8 @@ export default function AccountScreen() {
             <PasswordVisibilityIcon visible={showPassword} />
           </Pressable>
         </View>
+        {!isRegistering ? <ForgotPasswordLink /> : null}
+        {appleAvailable ? <Text style={styles.body}>You can sign in with Apple using Hide My Email. Before continuing with membership or door access, we require a verified non-relay contact email for access instructions and important account notices.</Text> : null}
         {isRegistering ? <PasswordRequirements password={password} /> : null}
         {isRegistering ? <>
           <Pressable style={styles.consentRow} onPress={() => setSmsOptIn((value) => !value)}>
@@ -249,6 +252,6 @@ export default function AccountScreen() {
 
 const localStyles = StyleSheet.create({
   appleSignIn: { gap: spacing.sm, marginTop: spacing.sm },
-  divider: { color: colors.muted, fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  divider: { color: colors.muted, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   appleButton: { height: 50, width: '100%' },
 });

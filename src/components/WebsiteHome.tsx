@@ -16,11 +16,11 @@ export function WebsiteHome() {
   const [loading, setLoading] = useState(true);
   const requestIdRef = useRef(0);
 
-  const loadContent = useCallback(() => {
+  const loadContent = useCallback((forceRefresh = false) => {
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError('');
-    getHomeContent()
+    getHomeContent(forceRefresh)
       .then((nextContent) => { if (requestIdRef.current === requestId) setContent(nextContent); })
       .catch((err: unknown) => {
         if (requestIdRef.current === requestId) setError(err instanceof Error ? err.message : 'Unable to load website content.');
@@ -41,7 +41,7 @@ export function WebsiteHome() {
           <Text style={homeStyles.cardTitle}>Website content unavailable</Text>
           <Text style={homeStyles.error}>{error}</Text>
           {content ? <Text style={homeStyles.body}>Showing the previously loaded panels.</Text> : null}
-          <PrimaryButton label="TRY AGAIN" onPress={loadContent} />
+          <PrimaryButton label="TRY AGAIN" onPress={() => loadContent(true)} />
         </SectionCard>
       ) : null}
       {content ? (

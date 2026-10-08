@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Scroll
 import { Image } from 'expo-image';
 
 import { getCurrentMembership, getMembershipPackages, MembershipPackage, MembershipRecord, startGuestMembershipCheckout, startMembershipCheckout } from '../api/membership';
+import { getContactEmailStatus } from '../api/contact-email';
 import { BrandMark } from '../components/BrandMark';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PasswordRequirements } from '../components/PasswordRequirements';
@@ -68,6 +69,12 @@ export default function MembershipScreen() {
         setCheckoutError('');
         setLoadingPackage(packageInfo.slug);
         try {
+            if (user && (await getContactEmailStatus()).required) {
+                Alert.alert('Verify your contact email',
+                    'Add and verify a non-relay contact email in Profile before continuing. You can keep signing in with Apple.',
+                    [{ text: 'Not now', style: 'cancel' }, { text: 'OPEN PROFILE', onPress: () => router.push('/account') }]);
+                return;
+            }
             const result = user
                 ? await startMembershipCheckout(packageInfo.slug)
                 : await startGuestMembershipCheckout({

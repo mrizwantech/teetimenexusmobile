@@ -11,7 +11,7 @@ import { colors, homeStyles, radii, spacing } from '../theme';
 import { PrimaryButton } from './PrimaryButton';
 import { SectionCard } from './SectionCard';
 
-export function HomePanels({ content, columns = 1 }: { content: { section: HomeContent['section']; panels: ContentPanel[] }; columns?: 1 | 2 }) {
+export function HomePanels({ content, columns = 1, mediaOnly = false }: { content: { section: HomeContent['section']; panels: ContentPanel[] }; columns?: 1 | 2; mediaOnly?: boolean }) {
   const [selectedMedia, setSelectedMedia] = useState<HomePanel | null>(null);
   const [openingVideo, setOpeningVideo] = useState(false);
   const [gridWidth, setGridWidth] = useState(0);
@@ -31,18 +31,18 @@ export function HomePanels({ content, columns = 1 }: { content: { section: HomeC
 
   return (
     <>
-      <View style={styles.heading}>
+      {!mediaOnly ? <View style={styles.heading}>
         <Text style={homeStyles.sectionTitle}>{content.section.title}</Text>
         <Text style={homeStyles.body}>{content.section.subtitle}</Text>
-      </View>
+      </View> : null}
       <View style={columns === 2 ? styles.grid : styles.list} onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}>
       {content.panels.map((panel) => (
-        <View key={panel.id} style={columns === 2 ? { width: gridWidth ? Math.max(1, (gridWidth - spacing.sm) / 2) : '48%' } : styles.listCard}>
+        <View key={panel.id} style={columns === 2 ? { width: gridWidth ? Math.max(1, (gridWidth - spacing.md) / 2) : '48%' } : styles.listCard}>
         <SectionCard compact={columns === 2}>
           {panel.media ? panel.video_url ? (
             <Pressable accessibilityRole="button" accessibilityLabel={`Watch ${panel.title} on YouTube`} disabled={openingVideo} onPress={() => { if (panel.video_url) void openVideo(panel.video_url); }}>
               <PanelImage key={panel.media} panel={panel} />
-              <Text style={styles.animationLabel}>Tap to watch on YouTube</Text>
+              {!mediaOnly ? <Text style={styles.animationLabel}>Tap to watch on YouTube</Text> : null}
             </Pressable>
           ) : panel.media_type === 'video' ? (
             <Pressable accessibilityRole="button" accessibilityLabel={`Play ${panel.title} video`} onPress={() => setSelectedMedia(panel)} style={[styles.videoPreview, columns === 2 && styles.compactPreview]}>
@@ -52,11 +52,12 @@ export function HomePanels({ content, columns = 1 }: { content: { section: HomeC
           ) : panel.media_type === 'gif' ? (
             <Pressable accessibilityRole="button" accessibilityLabel={`Play ${panel.title} animation`} onPress={() => setSelectedMedia(panel)}>
               <PanelImage key={panel.media} panel={panel} autoplay={false} />
-              <Text style={styles.animationLabel}>Tap to play animation</Text>
+              {!mediaOnly ? <Text style={styles.animationLabel}>Tap to play animation</Text> : null}
             </Pressable>
           ) : <PanelImage key={panel.media} panel={panel} /> : null}
-          {panel.number ? <Text style={styles.number}>{panel.number}</Text> : null}
-          <Text style={columns === 2 ? styles.gridTitle : homeStyles.cardTitle}>{panel.title}</Text>
+          {!mediaOnly && panel.number ? <Text style={styles.number}>{panel.number}</Text> : null}
+          <Text style={[columns === 2 ? styles.gridTitle : homeStyles.cardTitle, mediaOnly && styles.featureTitle]}>{panel.title}</Text>
+          {!mediaOnly ? <>
           <Text style={columns === 2 ? styles.gridBody : homeStyles.body}>{panel.text}</Text>
           {panel.details?.map((detail) => <Text key={detail} style={columns === 2 ? styles.gridBody : homeStyles.body}>{'\u2022'} {detail}</Text>)}
           {panel.subsections?.map((subsection) => (
@@ -66,6 +67,7 @@ export function HomePanels({ content, columns = 1 }: { content: { section: HomeC
             </View>
           ))}
           {panel.after ? <Text style={columns === 2 ? styles.gridBody : homeStyles.body}>{panel.after}</Text> : null}
+          </> : null}
         </SectionCard>
         </View>
       ))}
@@ -124,11 +126,12 @@ function PanelVideo({ uri }: { uri: string }) {
 const styles = StyleSheet.create({
   list: { gap: spacing.lg },
   listCard: { width: '100%' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'flex-start' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, alignItems: 'flex-start' },
   gridTitle: { color: colors.heading, fontSize: 17, fontWeight: '800', lineHeight: 23, marginBottom: spacing.sm },
-  gridBody: { color: colors.muted, fontSize: 14, lineHeight: 21, marginBottom: spacing.sm },
-  number: { color: colors.primary, fontSize: 12, fontWeight: '800', marginBottom: spacing.sm },
-  subsection: { gap: spacing.xs },
+  featureTitle: { color: colors.primary },
+  gridBody: { color: colors.text, fontSize: 17, fontWeight: '500', lineHeight: 26, marginBottom: spacing.sm },
+  number: { color: colors.primary, fontSize: 14, fontWeight: '800', marginBottom: spacing.sm },
+  subsection: { gap: spacing.sm },
   subsectionTitle: { color: colors.heading, fontSize: 14, fontWeight: '700' },
   heading: { gap: spacing.sm, paddingTop: spacing.sm },
   mediaContainer: { marginBottom: spacing.sm },
@@ -139,6 +142,6 @@ const styles = StyleSheet.create({
   compactPreview: { padding: spacing.xs },
   compactPlayIcon: { color: colors.primary, fontSize: 24 },
   playIcon: { color: colors.primary, fontSize: 36 },
-  playLabel: { color: colors.heading, fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  animationLabel: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  playLabel: { color: colors.heading, fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  animationLabel: { color: colors.primary, fontSize: 14, fontWeight: '700' },
 });

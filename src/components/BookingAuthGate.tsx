@@ -20,5 +20,5 @@ export function BookingAuthGate() {
 const styles = StyleSheet.create({
     container: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xxl },
     title: { color: colors.heading, fontSize: 28, fontWeight: '900', marginTop: spacing.md, textAlign: 'center' },
-    body: { color: colors.muted, fontSize: 15, lineHeight: 22, maxWidth: 320, textAlign: 'center' },
+    body: { color: colors.text, fontSize: 17, fontWeight: '500', lineHeight: 26, maxWidth: 320, textAlign: 'center' },
 });

@@ -16,6 +16,8 @@ expo-env.d.ts
 *.jks
 *.mobileprovision
 *.tsbuildinfo
+/modules/*/android/build/
+/modules/*/android/.gradle/
 # Firebase app configuration files must be included in the build archive.
 !/GoogleService-Info.plist
 !/google-services.json

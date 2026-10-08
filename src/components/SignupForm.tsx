@@ -93,5 +93,5 @@ const localStyles = StyleSheet.create({
     focusedInput: { borderColor: colors.primary, borderWidth: 1.5 },
     passwordInput: { paddingRight: spacing.xl },
     passwordIcon: { alignItems: 'center', justifyContent: 'center', padding: spacing.xs, position: 'absolute', right: spacing.sm, top: 8 },
-    loginLink: { color: colors.primary, fontSize: 13, marginTop: spacing.sm, paddingVertical: spacing.xs, textAlign: 'center', textDecorationLine: 'underline' },
+    loginLink: { color: colors.primary, fontSize: 14, marginTop: spacing.sm, paddingVertical: spacing.xs, textAlign: 'center', textDecorationLine: 'underline' },
 });

@@ -13,9 +13,12 @@
       "bundleIdentifier": "com.teetimenexus.app",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Use Bluetooth to unlock the entrance with your phone during an eligible member booking.",
         "UIBackgroundModes": [
-          "remote-notification"
-        ]
+          "remote-notification",
+          "bluetooth-peripheral"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "aps-environment": "development"
@@ -23,10 +26,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.teetimenexus.app",
@@ -36,6 +37,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/with-kisi-sdk",
       "expo-router",
       "expo-apple-authentication",
       "expo-status-bar",
@@ -69,6 +71,15 @@
           "color": "#A1E04C"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "kisi": {
+        "partnerId": 1053
+      },
+      "router": {},
+      "eas": {
+        "projectId": "3c0d7365-63df-43f1-8224-ebc4fa480b84"
+      }
+    }
   }
 }

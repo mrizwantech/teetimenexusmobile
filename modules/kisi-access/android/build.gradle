@@ -1,0 +1,30 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.kisiaccess'
+version = '0.1.0'
+
+repositories {
+  maven { url uri("$projectDir/vendor") }
+}
+
+dependencies {
+  implementation 'de.kisi:st2u:0.16'
+  implementation 'at.favre.lib:hkdf:1.1.0'
+  implementation 'com.github.weliem:blessed-android:2.5.0'
+  implementation 'io.reactivex.rxjava3:rxjava:3.1.8'
+  implementation 'androidx.appcompat:appcompat:1.7.0'
+}
+
+android {
+  namespace "expo.modules.kisiaccess"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}

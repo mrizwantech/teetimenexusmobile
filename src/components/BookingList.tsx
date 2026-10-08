@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     tabs: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, flexDirection: 'row', overflow: 'hidden' },
     tab: { alignItems: 'center', flex: 1, minHeight: 40, justifyContent: 'center' },
     activeTab: { backgroundColor: colors.primary },
-    tabText: { color: colors.muted, fontSize: 12, fontWeight: '800' },
+    tabText: { color: colors.muted, fontSize: 14, fontWeight: '800' },
     activeTabText: { color: colors.primaryContrast },
     loader: { marginVertical: spacing.xl },
     error: { color: colors.danger, fontSize: 14 },
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     bookingImage: { borderTopLeftRadius: radii.md, borderBottomLeftRadius: radii.md },
     copy: { flex: 1, gap: 4, padding: spacing.sm },
     bayName: { color: colors.heading, fontSize: 16, fontWeight: '900' },
-    meta: { color: colors.muted, fontSize: 11 },
-    status: { color: colors.primary, fontSize: 11, fontWeight: '800', marginTop: 2, textTransform: 'capitalize' },
+    meta: { color: colors.muted, fontSize: 14 },
+    status: { color: colors.primary, fontSize: 14, fontWeight: '800', marginTop: 2, textTransform: 'capitalize' },
     cancelled: { color: colors.danger },
 });

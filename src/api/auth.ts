@@ -30,6 +30,8 @@ export async function loginWithApple(params: {
     identityToken: string;
     nonce: string;
     name?: string;
+    givenName?: string;
+    familyName?: string;
 }): Promise<LoginResponse> {
     const response = await fetch(`${API_BASE_URL}/wp-json/ttn/v1/auth/apple`, {
         method: 'POST',
@@ -38,6 +40,8 @@ export async function loginWithApple(params: {
             identity_token: params.identityToken,
             nonce: params.nonce,
             name: params.name?.trim() ?? '',
+            given_name: params.givenName?.trim() ?? '',
+            family_name: params.familyName?.trim() ?? '',
         }).toString(),
     });
 
