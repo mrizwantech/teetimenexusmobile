@@ -16,11 +16,14 @@ export async function readPushState(requestPermission = false): Promise<PushStat
   if (isExpoGo) return { permission: 'unsupported', token: null };
   const notifications = await import('expo-notifications');
   if (Platform.OS === 'android') {
-    await notifications.setNotificationChannelAsync('ttn-updates', {
-      name: 'Tee Time Nexus updates',
-      importance: notifications.AndroidImportance.HIGH,
-      sound: 'default',
-    });
+    // Channel ids must match ANDROID_CHANNELS in functions/src/messages.ts.
+    const channels = [
+      { id: 'ttn-bookings', name: 'Bookings and reminders', description: 'Booking confirmations, changes, cancellations and 15-minute reminders.', importance: notifications.AndroidImportance.HIGH },
+      { id: 'ttn-account', name: 'Account messages', description: 'Important messages about your Tee Time Nexus account.', importance: notifications.AndroidImportance.DEFAULT },
+      { id: 'ttn-marketing', name: 'Offers and news', description: 'Promotions and club news you opted into.', importance: notifications.AndroidImportance.LOW },
+      { id: 'ttn-updates', name: 'Tee Time Nexus updates', description: 'General updates.', importance: notifications.AndroidImportance.HIGH },
+    ];
+    await Promise.all(channels.map(({ id, ...channel }) => notifications.setNotificationChannelAsync(id, { ...channel, sound: 'default' })));
   }
   const settings = requestPermission
     ? await notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowBadge: true, allowSound: true } })
@@ -53,6 +56,12 @@ export async function readPushState(requestPermission = false): Promise<PushStat
       connectionError: err instanceof Error ? err.message : 'Unable to obtain a Firebase device token.',
     };
   }
+}
+
+export async function releasePushToken() {
+  if (isExpoGo) return;
+  const { sdk, messaging } = await loadMessaging();
+  await sdk.deleteToken(messaging);
 }
 
 export async function listenForPush(listeners: PushListeners): Promise<() => void> {

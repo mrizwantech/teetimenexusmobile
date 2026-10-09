@@ -1,5 +1,6 @@
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { clearKisiCredentials } from '../../modules/kisi-access';
+import { releasePushDevice } from '../notifications/device-registration';
 
 import {
     AuthUser,
@@ -71,6 +72,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 return result.welcome_email_sent === true;
             },
             logout: async () => {
+                await releasePushDevice();
                 await clearKisiCredentials();
                 await apiLogout();
                 if (mountedRef.current) setUser(null);

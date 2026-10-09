@@ -10,4 +10,5 @@ export type KisiDeviceCredential = {
 
 export type KisiAccessModuleEvents = {
   onUnlock: (params: { success: boolean; error?: string }) => void;
+  onReaderError: (params: { message: string }) => void;
 };

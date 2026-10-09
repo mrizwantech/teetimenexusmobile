@@ -2,9 +2,9 @@ import { Pressable, Text } from 'react-native';
 
 import { primaryButtonStyles as styles } from '../theme';
 
-type Props = { label: string; onPress?: () => void; secondary?: boolean; disabled?: boolean };
+type Props = { label: string; onPress?: () => void; secondary?: boolean; disabled?: boolean; small?: boolean };
 
-export function PrimaryButton({ label, onPress, secondary = false, disabled = false }: Props) {
+export function PrimaryButton({ label, onPress, secondary = false, disabled = false, small = false }: Props) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -13,12 +13,13 @@ export function PrimaryButton({ label, onPress, secondary = false, disabled = fa
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        small && styles.small,
         secondary && styles.secondary,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
       ]}
     >
-      <Text style={[styles.label, secondary && styles.secondaryLabel, disabled && styles.disabledLabel]}>{label}</Text>
+      <Text style={[styles.label, small && styles.smallLabel, secondary && styles.secondaryLabel, disabled && styles.disabledLabel]}>{label}</Text>
     </Pressable>
   );
 }

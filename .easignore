@@ -21,3 +21,8 @@ expo-env.d.ts
 # Firebase app configuration files must be included in the build archive.
 !/GoogleService-Info.plist
 !/google-services.json
+/functions/
+/firebase.json
+/.firebaserc
+/firestore.rules
+/firestore.indexes.json

@@ -14,6 +14,7 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Use Bluetooth to unlock the entrance with your phone during an eligible member booking.",
+        "NSLocationWhenInUseUsageDescription": "Detect the nearby Kisi entrance reader for secure in-app unlocking. Your location is not sent to Tee Time Nexus.",
         "UIBackgroundModes": [
           "remote-notification",
           "bluetooth-peripheral"

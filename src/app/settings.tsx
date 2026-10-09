@@ -25,11 +25,11 @@ export default function SettingsScreen() {
         <BrandMark />
         <Link href="/account"><Text style={{ color: colors.primary }}>Back to profile</Text></Link>
       </ScreenHeader>
-      <Text style={styles.title}>Settings</Text>
-      <SectionCard>
-        <Text style={styles.cardTitle}>Notifications</Text>
-        <Text style={styles.body}>Manage push notifications and this device&apos;s notification permissions.</Text>
-        <Link href="/notifications" asChild><PrimaryButton label="MANAGE NOTIFICATIONS" /></Link>
+      <Text accessibilityRole="header" style={[styles.title, { fontSize: 22, lineHeight: 28 }]}>Settings</Text>
+      <SectionCard accent>
+        <Text style={[styles.cardTitle, { fontSize: 17 }]}>Notifications</Text>
+        <Text style={[styles.body, { fontSize: 14, lineHeight: 20 }]}>Manage push notifications and this device&apos;s notification permissions.</Text>
+        <Link href="/notifications" asChild><PrimaryButton small label="MANAGE NOTIFICATIONS" /></Link>
       </SectionCard>
     </Screen>
   );

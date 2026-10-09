@@ -66,7 +66,7 @@ function BookingRow({ booking, index }: { booking: BookingRecord; index: number 
     return (
         <Pressable
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/reservation', params: { bay: booking.bay, date: booking.date, time: booking.time, duration: String(booking.duration), players: String(booking.players), bayIndex: String(index) } })}
+            onPress={() => router.push({ pathname: '/reservation', params: { bookingId: String(booking.ID), bay: booking.bay, date: booking.date, time: booking.time, duration: String(booking.duration), players: String(booking.players), bayIndex: String(index) } })}
             style={styles.bookingCard}
         >
             <ImageBackground source={{ uri: bayImages[index % bayImages.length] }} imageStyle={styles.bookingImage} style={styles.imageFrame} />

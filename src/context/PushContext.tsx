@@ -3,6 +3,8 @@ import { Alert, AppState, Platform, Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Link, router, useRootNavigationState } from 'expo-router';
 
+import { useAuth } from './AuthContext';
+import { syncDeviceRegistration } from '../notifications/device-registration';
 import { listenForPush, readPushState } from '../notifications/push';
 import { getNotificationRoute, NotificationRoute } from '../notifications/routes';
 import { PushMessage, PushState } from '../notifications/types';
@@ -11,6 +13,7 @@ import { colors, spacing } from '../theme';
 type PushContextValue = PushState & {
   loading: boolean;
   error: string;
+  registrationError: string;
   refresh: (requestPermission?: boolean) => Promise<boolean>;
   introReady: boolean;
   showIntro: boolean;
@@ -20,7 +23,9 @@ type PushContextValue = PushState & {
 const PushContext = createContext<PushContextValue | undefined>(undefined);
 
 export function PushProvider({ children }: PropsWithChildren) {
+  const { user } = useAuth();
   const [state, setState] = useState<PushState>({ permission: 'not-determined', token: null });
+  const [registrationError, setRegistrationError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [listenerError, setListenerError] = useState('');
@@ -122,6 +127,26 @@ export function PushProvider({ children }: PropsWithChildren) {
     if (navigation?.key && pendingOpen) router.push(pendingOpen.route);
   }, [navigation?.key, pendingOpen]);
 
+  // Link this phone's token to the signed-in account; retried whenever the push state refreshes.
+  const userId = user?.id ?? null;
+  const previousUserIdRef = useRef(userId);
+  useEffect(() => {
+    const previousUserId = previousUserIdRef.current;
+    previousUserIdRef.current = userId;
+    // Sign-out deletes the token, so fetch a fresh one for the next account.
+    if (previousUserId && previousUserId !== userId) {
+      void refresh();
+      return;
+    }
+    let cancelled = false;
+    syncDeviceRegistration(userId, state.token)
+      .then(() => { if (!cancelled) setRegistrationError(''); })
+      .catch((err: unknown) => {
+        if (!cancelled) setRegistrationError(err instanceof Error ? err.message : 'Unable to link notifications to your account.');
+      });
+    return () => { cancelled = true; };
+  }, [userId, state, refresh]);
+
   async function refreshConnection(requestPermission = false) {
     setLoading(true);
     if (listenerError) setListenerAttempt((attempt) => attempt + 1);
@@ -142,7 +167,7 @@ export function PushProvider({ children }: PropsWithChildren) {
   const showIntro = introDismissed === false && !loading && !error && !listenerError && state.permission === 'not-determined';
 
   return (
-    <PushContext.Provider value={{ ...state, loading, error: error || listenerError || introError, refresh: refreshConnection, introReady: introDismissed !== null, showIntro, dismissIntro }}>
+    <PushContext.Provider value={{ ...state, loading, error: error || listenerError || introError, registrationError, refresh: refreshConnection, introReady: introDismissed !== null, showIntro, dismissIntro }}>
       {children}
       {error || listenerError || introError ? (
         <View style={{ padding: spacing.sm, backgroundColor: colors.surface }}>

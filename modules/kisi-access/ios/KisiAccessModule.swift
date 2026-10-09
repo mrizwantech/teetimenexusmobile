@@ -1,6 +1,40 @@
 import ExpoModulesCore
 import SecureAccess
 import Foundation
+import CoreLocation
+
+private final class KisiReaderPermission: NSObject, CLLocationManagerDelegate {
+  private lazy var manager = CLLocationManager()
+  private var pending: Promise?
+
+  func start(_ promise: Promise) {
+    guard pending == nil else {
+      promise.reject(NSError(domain: "KisiAccess", code: 2, userInfo: [NSLocalizedDescriptionKey: "A reader permission request is already in progress."]))
+      return
+    }
+    manager.delegate = self
+    pending = promise
+    if manager.authorizationStatus == .notDetermined {
+      manager.requestWhenInUseAuthorization()
+    } else {
+      finish()
+    }
+  }
+
+  func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { finish() }
+
+  private func finish() {
+    guard let promise = pending, manager.authorizationStatus != .notDetermined else { return }
+    pending = nil
+    guard manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse else {
+      promise.reject(NSError(domain: "KisiAccess", code: 3, userInfo: [NSLocalizedDescriptionKey: "Allow location access in device settings to detect the nearby entrance reader."]))
+      return
+    }
+    ReaderManager.shared.startMonitoring()
+    ReaderManager.shared.startRanging()
+    promise.resolve(nil)
+  }
+}
 
 struct KisiCredential: Record {
   @Field var organizationId: Int = 0
@@ -64,10 +98,25 @@ private final class KisiDelegate: TapToAccessDelegate, @unchecked Sendable {
 
 public class KisiAccessModule: Module {
   private let kisiDelegate = KisiDelegate()
+  private let readerPermission = KisiReaderPermission()
 
   public func definition() -> ModuleDefinition {
     Name("KisiAccess")
-    Events("onUnlock")
+    Events("onUnlock", "onReaderError")
+    AsyncFunction("startReaderScan") { (promise: Promise) in
+      self.readerPermission.start(promise)
+    }.runOnQueue(.main)
+    AsyncFunction("stopReaderScan") {
+      ReaderManager.shared.stopRanging()
+      ReaderManager.shared.stopMonitoring()
+    }.runOnQueue(.main)
+    AsyncFunction("proximityProof") { (lockId: Int) -> String in
+      guard lockId > 0, ReaderManager.shared.isNearbyLock(lockId),
+            let proof = ReaderManager.shared.proximityProofForLock(lockId) else {
+        throw NSError(domain: "KisiAccess", code: 4, userInfo: [NSLocalizedDescriptionKey: "The entrance reader is not nearby. Turn on Bluetooth, stand near the reader, and retry."])
+      }
+      return String(proof)
+    }.runOnQueue(.main)
     AsyncFunction("initialize") { (partnerId: Int, credential: KisiCredential) in
       guard partnerId > 0, credential.organizationId > 0, credential.loginId > 0,
             !credential.secret.isEmpty, !credential.phoneKey.isEmpty, !credential.onlineCertificate.isEmpty,
@@ -90,6 +139,8 @@ public class KisiAccessModule: Module {
       self.kisiDelegate.setReport(nil)
       TapToAccessManager.shared.stop()
       TapToAccessManager.shared.delegate = nil
+      ReaderManager.shared.stopRanging()
+      ReaderManager.shared.stopMonitoring()
     }.runOnQueue(.main)
     OnDestroy {
       self.kisiDelegate.configure(0, nil)
@@ -97,6 +148,8 @@ public class KisiAccessModule: Module {
       Task { @MainActor in
         TapToAccessManager.shared.stop()
         TapToAccessManager.shared.delegate = nil
+        ReaderManager.shared.stopRanging()
+        ReaderManager.shared.stopMonitoring()
       }
     }
   }

@@ -1,6 +1,8 @@
 import { apiRequest } from './client';
 import { isRecord } from './home-content';
 import { getCachedPublicContent, PUBLIC_CONTENT_CACHE_MAX_AGE_MS } from './public-content-cache';
+import { MembershipRecord, membershipDisplayName, parseCurrentMembership, parseMembershipManagementResult } from './membership-rules';
+export type { MembershipRecord } from './membership-rules';
 
 export type MembershipPackage = {
     slug: string;
@@ -11,16 +13,6 @@ export type MembershipPackage = {
     featured: boolean;
     features: string[];
     thumbnail_url?: string | null;
-};
-
-export type MembershipRecord = {
-    package_name: string;
-    price: string;
-    discount_price: string;
-    status: string;
-    payment_status: string;
-    next_billing_date: string | null;
-    cancel_date: string | null;
 };
 
 function isMembershipPackage(value: unknown): value is MembershipPackage {
@@ -40,7 +32,7 @@ function parseMembershipPackages(value: unknown): MembershipPackage[] {
     if (!Array.isArray(value) || !value.every(isMembershipPackage)) {
         throw new Error('The website returned invalid membership packages. Please try again.');
     }
-    return value;
+    return value.map((packageInfo) => ({ ...packageInfo, title: membershipDisplayName(packageInfo.title) }));
 }
 
 export function getMembershipPackages(forceRefresh = false): Promise<MembershipPackage[]> {
@@ -53,8 +45,18 @@ export function getMembershipPackages(forceRefresh = false): Promise<MembershipP
     });
 }
 
-export function getCurrentMembership(): Promise<MembershipRecord | null> {
-    return apiRequest<MembershipRecord | null>('/wp-json/ttn/v1/membership/current');
+export async function getCurrentMembership(): Promise<MembershipRecord | null> {
+    return parseCurrentMembership(await apiRequest<unknown>('/wp-json/ttn/v1/membership/current', { cache: 'no-store' }));
+}
+
+export async function manageMembership(action: 'change' | 'cancel' | 'undo', membership: MembershipRecord, packageSlug?: string) {
+    if (!membership.revision || !membership.can_manage) {
+        throw new Error('Membership management is not available yet. Refresh or contact support.');
+    }
+    return parseMembershipManagementResult(await apiRequest<unknown>('/wp-json/ttn/v1/membership/manage', {
+        method: 'POST', cache: 'no-store',
+        body: JSON.stringify({ action, revision: membership.revision, package: packageSlug }),
+    }));
 }
 
 export function startMembershipCheckout(packageSlug: string): Promise<{ bridge_url: string }> {

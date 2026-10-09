@@ -6,6 +6,8 @@ export async function readPushState(_requestPermission = false): Promise<PushSta
   return { permission: 'unsupported', token: null };
 }
 
+export async function releasePushToken() {}
+
 export async function listenForPush(_listeners: PushListeners): Promise<() => void> {
   return () => {};
 }

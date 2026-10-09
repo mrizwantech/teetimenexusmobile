@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import { MembershipRecord } from './membership';
+import { getCurrentMembership, MembershipRecord } from './membership';
 
 export type BookingRecord = {
     ID: number;
@@ -18,5 +18,5 @@ export function getMyBookings(): Promise<BookingRecord[]> {
 }
 
 export function getMyMembership(): Promise<MembershipRecord | null> {
-    return apiRequest<MembershipRecord | null>('/wp-json/ttn/v1/membership/current');
+    return getCurrentMembership();
 }

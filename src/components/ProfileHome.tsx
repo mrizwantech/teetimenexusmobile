@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 
 import { AuthUser } from '../api/auth';
 import { BookingRecord, getMyBookings, getMyMembership } from '../api/account';
@@ -15,10 +15,13 @@ export function ProfileHome({ user }: ProfileHomeProps) {
     const [bookings, setBookings] = useState<BookingRecord[]>([]);
     const [membership, setMembership] = useState<Awaited<ReturnType<typeof getMyMembership>>>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
+        if (!user.id) return;
         let cancelled = false;
-
+        setIsLoading(true);
+        setError('');
         Promise.all([getMyBookings(), getMyMembership()])
             .then(([nextBookings, nextMembership]) => {
                 if (!cancelled) {
@@ -26,10 +29,9 @@ export function ProfileHome({ user }: ProfileHomeProps) {
                     setMembership(nextMembership);
                 }
             })
-            .catch(() => {
+            .catch((err: unknown) => {
                 if (!cancelled) {
-                    setBookings([]);
-                    setMembership(null);
+                    setError(err instanceof Error ? err.message : 'Unable to refresh your account. Please try again.');
                 }
             })
             .finally(() => {
@@ -39,7 +41,7 @@ export function ProfileHome({ user }: ProfileHomeProps) {
         return () => {
             cancelled = true;
         };
-    }, [user.id]);
+    }, [user.id]));
 
     const firstName = user.display_name.trim().split(/\s+/)[0] || 'Golfer';
     const hour = new Date().getHours();
@@ -54,6 +56,7 @@ export function ProfileHome({ user }: ProfileHomeProps) {
                 <Text style={styles.greeting}>{greeting}, {firstName} <Text style={styles.wave}>👋</Text></Text>
                 <Text style={styles.ready}>Ready to play?</Text>
             </View>
+            {error ? <Text accessibilityRole="alert" style={styles.emptyText}>{error}</Text> : null}
 
             <Link href="/book" asChild>
                 <PrimaryButton label="BOOK A BAY   →" />
@@ -78,6 +81,7 @@ export function ProfileHome({ user }: ProfileHomeProps) {
                             href={{
                                 pathname: '/reservation',
                                 params: {
+                                    bookingId: String(upcomingBooking.ID),
                                     bay: upcomingBooking.bay,
                                     date: upcomingBooking.date,
                                     time: upcomingBooking.time,
@@ -102,7 +106,7 @@ export function ProfileHome({ user }: ProfileHomeProps) {
                         <Text style={styles.membershipTitle}>{membershipName}</Text>
                         <Text style={styles.membershipMeta}>{membershipStatus}</Text>
                     </View>
-                    <Link href="/membership"><Text style={styles.panelLink}>View membership</Text></Link>
+                    <Link href="/membership"><Text style={styles.panelLink}>Manage membership</Text></Link>
                 </View>
             </View>
 

@@ -12,6 +12,7 @@ import { ScreenHeader } from './Screen';
 import { colors, radii, spacing } from '../theme';
 
 type BookingDetailsProps = {
+    bookingId: number;
     bay: string;
     date: string;
     time: string;
@@ -26,7 +27,7 @@ function formatReservationDate(date: string): string {
     return parsedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function BookingDetails({ bay, date, time, duration, players, bayIndex = 0 }: BookingDetailsProps) {
+export function BookingDetails({ bookingId, bay, date, time, duration, players, bayIndex = 0 }: BookingDetailsProps) {
     const bayRecord = { key: bay, name: bay, type: 'dual' as const, location: 'Tee Time Nexus', premium: false, hourly_price: 0 };
     const [inviteVisible, setInviteVisible] = useState(false);
     const [inviteName, setInviteName] = useState('');
@@ -82,7 +83,7 @@ export function BookingDetails({ bay, date, time, duration, players, bayIndex = 
                 <View style={styles.accessIcon}><Text style={styles.accessIconText}>▣</Text></View>
                 <View style={styles.accessCopy}>
                     <Text style={styles.accessTitle}>Access</Text>
-                    <Text style={styles.accessBody}>Your door access will be available shortly before your reservation.</Text>
+                    <Text style={styles.accessBody}>Active, paid members can access the entrance from 15 minutes before their reservation until it ends.</Text>
                 </View>
                 <PrimaryButton label="Unlock Door" onPress={showAccessMessage} />
             </View>
@@ -115,7 +116,7 @@ export function BookingDetails({ bay, date, time, duration, players, bayIndex = 
             </Pressable>
             <BookingPolicyLink />
 
-            <DoorAccess visible={doorAccessVisible} onClose={() => setDoorAccessVisible(false)} />
+            {doorAccessVisible ? <DoorAccess bookingId={bookingId} visible onClose={() => setDoorAccessVisible(false)} /> : null}
         </>
     );
 }
