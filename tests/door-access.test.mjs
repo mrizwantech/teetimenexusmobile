@@ -48,7 +48,11 @@ test('reservation ID is wired through every door access surface and fake access 
   assert.match(read('src/components/BookingList.tsx'), /bookingId: String\(booking\.ID\)/);
   assert.match(read('src/components/ProfileHome.tsx'), /bookingId: String\(upcomingBooking\.ID\)/);
   assert.match(read('src/app/reservation.tsx'), /bookingId=\{Number\(bookingId\)\}/);
-  assert.match(read('src/components/BookingDetails.tsx'), /<DoorAccess bookingId=\{bookingId\}/);
+  const details = read('src/components/BookingDetails.tsx');
+  assert.match(details, /<DoorAccess bookingId=\{bookingId\}/);
+  assert.match(details, /membership\?\.status === 'active' && membership\.payment_status === 'paid'/);
+  assert.match(details, /\{isPaidMember \? <View style=\{styles\.accessCard\}>/);
+  assert.match(details, /\{isPaidMember && doorAccessVisible \? <DoorAccess/);
   const door = read('src/components/DoorAccess.tsx');
   assert.doesNotMatch(door, /5327|14 \* 60 \+ 32|accessCode|Door Access Code/);
   assert.match(door, /createDoorCredential\(bookingId\)/);

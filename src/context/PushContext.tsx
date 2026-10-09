@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Link, router, useRootNavigationState } from 'expo-router';
 
 import { useAuth } from './AuthContext';
-import { syncDeviceRegistration } from '../notifications/device-registration';
+import { discardPushToken, syncDeviceRegistration } from '../notifications/device-registration';
 import { listenForPush, readPushState } from '../notifications/push';
 import { getNotificationRoute, NotificationRoute } from '../notifications/routes';
 import { PushMessage, PushState } from '../notifications/types';
@@ -140,7 +140,14 @@ export function PushProvider({ children }: PropsWithChildren) {
     }
     let cancelled = false;
     syncDeviceRegistration(userId, state.token)
-      .then(() => { if (!cancelled) setRegistrationError(''); })
+      .then(async (outcome) => {
+        if (outcome === 'renew') {
+          await discardPushToken();
+          if (!cancelled) await refresh();
+          return;
+        }
+        if (!cancelled) setRegistrationError('');
+      })
       .catch((err: unknown) => {
         if (!cancelled) setRegistrationError(err instanceof Error ? err.message : 'Unable to link notifications to your account.');
       });

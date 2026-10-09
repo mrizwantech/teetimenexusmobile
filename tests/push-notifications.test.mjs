@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { needsRegistration, parsePushPreferences } from '../src/api/push-rules.ts';
+import { isRejectedRegistration, needsRegistration, parsePushPreferences } from '../src/api/push-rules.ts';
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 
@@ -20,6 +20,16 @@ test('a device is registered once per account and token', () => {
   assert.equal(needsRegistration({ userId: 7, token: 'token-a' }, 8, 'token-a'), true);
   assert.equal(needsRegistration(null, null, 'token-a'), false);
   assert.equal(needsRegistration(null, 7, null), false);
+});
+
+test('only an explicit invalid_token answer makes the app renew its token', () => {
+  assert.equal(isRejectedRegistration({ registered: false, reason: 'invalid_token' }), true);
+  for (const ok of [{ registered: true }, {}, null, 'ok', { registered: false }]) {
+    assert.equal(isRejectedRegistration(ok), false);
+  }
+  const sync = read('src/notifications/device-registration.ts');
+  assert.match(sync, /renewedTokens\.has\(token\)/, 'a rejected token is renewed at most once per session');
+  assert.match(read('src/context/PushContext.tsx'), /discardPushToken\(\)[\s\S]*refresh\(\)/);
 });
 
 test('signing out releases the device before the session is cleared', () => {

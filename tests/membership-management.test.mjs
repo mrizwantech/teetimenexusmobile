@@ -32,11 +32,31 @@ test('legacy current-membership responses remain readable without offering unsup
 test('scheduled cancellation/downgrade use explicit server timestamps and reject invalid states', () => {
   const scheduled = { action: 'downgrade', package_name: 'ALBATROSS', effective_at: record.period_end };
   assert.equal(parseCurrentMembership({ ...record, scheduled_change: scheduled }).scheduled_change.package_name, 'EAGLE');
-  for (const value of [{}, undefined, { ...record, can_manage: 'yes' }, { ...record, period_end: NaN },
-    { ...record, revision: 'invalid' }, { ...record, scheduled_change: { ...scheduled, action: 'upgrade' } },
-    { ...record, scheduled_change: { ...scheduled, effective_at: -1 } }]) {
+  for (const value of [{}, undefined, { ...record, package_name: null }, { ...record, package_name: ' ' }]) {
     assert.throws(() => parseCurrentMembership(value));
   }
+  for (const value of [{ ...record, can_manage: 'yes' }, { ...record, period_end: NaN },
+    { ...record, revision: 'invalid' }, { ...record, scheduled_change: { ...scheduled, action: 'upgrade' } },
+    { ...record, scheduled_change: { ...scheduled, effective_at: -1 } }]) {
+    const parsed = parseCurrentMembership(value);
+    assert.equal(parsed.package_name, 'EAGLE');
+    assert.equal(parsed.can_manage, false);
+    assert.equal(parsed.revision, undefined);
+  }
+});
+
+test('raw legacy database rows with nulls and numbers still display', () => {
+  const parsed = parseCurrentMembership({
+    id: '3', user_id: 7, package_name: 'albatross', price: 499, discount_price: null, status: 'Active',
+    payment_status: 'PAID', next_billing_date: '0000-00-00 00:00:00', cancel_date: null,
+  });
+  assert.equal(parsed.package_name, 'EAGLE');
+  assert.equal(parsed.price, '499');
+  assert.equal(parsed.discount_price, '');
+  assert.equal(parsed.status, 'active');
+  assert.equal(parsed.payment_status, 'paid');
+  assert.equal(parsed.next_billing_date, null);
+  assert.equal(parsed.can_manage, undefined);
 });
 
 test('management requires a real updated record or HTTPS checkout, never a success-shaped fallback', () => {
@@ -56,7 +76,9 @@ test('native controls refresh on focus, confirm changes and block duplicate requ
   }
   assert.match(screen, /Alert\.alert\(title, message/);
   assert.match(screen, /mutationInFlight\.current/);
-  assert.match(read('src/api/membership.ts'), /cache: 'no-store'/);
+  const api = read('src/api/membership.ts');
+  assert.match(api, /cache: 'no-store'/);
+  assert.match(api, /parseCurrentMembership\(value === undefined \? null : value\)/);
   assert.match(read('src/api/account.ts'), /return getCurrentMembership\(\)/);
   assert.match(read('src/components/ProfileHome.tsx'), /useFocusEffect/);
 });

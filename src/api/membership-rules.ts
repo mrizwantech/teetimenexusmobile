@@ -30,40 +30,69 @@ export function membershipDisplayName(name: string): string {
     return ['ALBATROSS', 'EAGLE'].includes(name.trim().toUpperCase()) ? 'EAGLE' : name;
 }
 
+function scalarText(value: unknown): string | null {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    return null;
+}
+
+function optionalText(value: unknown): string {
+    return value === null || value === undefined ? '' : scalarText(value) ?? '';
+}
+
+function optionalDate(value: unknown): string | null {
+    const text = value === null || value === undefined ? null : scalarText(value);
+    return text && text.trim() && !text.startsWith('0000-00-00') ? text : null;
+}
+
+function positiveTimestamp(value: unknown): number | null {
+    const number = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+    return Number.isSafeInteger(number) && Number(number) > 0 ? Number(number) : null;
+}
+
+// Legacy website responses send raw DB rows (nulls/numbers); management actions stay disabled unless every management field is valid.
 export function parseCurrentMembership(value: unknown): MembershipRecord | null {
     if (value === null) return null;
-    if (!isObject(value)
-        || !['package_name', 'price', 'discount_price', 'status', 'payment_status'].every((key) => typeof value[key] === 'string')
-        || !['next_billing_date', 'cancel_date'].every((key) => value[key] === null || typeof value[key] === 'string')
-        || (value.package_key !== undefined && typeof value.package_key !== 'string')
-        || (value.revision !== undefined && (typeof value.revision !== 'string' || !/^[a-f0-9]{64}$/.test(value.revision)))
-        || (value.can_manage !== undefined && typeof value.can_manage !== 'boolean')
-        || (value.management_notice !== undefined && typeof value.management_notice !== 'string')
-        || (value.period_end !== undefined && value.period_end !== null && (!Number.isSafeInteger(value.period_end) || Number(value.period_end) <= 0))) {
+    const packageName = isObject(value) ? scalarText(value.package_name)?.trim() : null;
+    if (!isObject(value) || !packageName) {
         throw new Error('The website returned invalid membership details. Please try again.');
     }
-    let scheduledChange: MembershipRecord['scheduled_change'];
+    const record: MembershipRecord = {
+        package_name: membershipDisplayName(packageName),
+        price: optionalText(value.price),
+        discount_price: optionalText(value.discount_price),
+        status: optionalText(value.status).trim().toLowerCase(),
+        payment_status: optionalText(value.payment_status).trim().toLowerCase(),
+        next_billing_date: optionalDate(value.next_billing_date),
+        cancel_date: optionalDate(value.cancel_date),
+        package_key: typeof value.package_key === 'string' && value.package_key.trim() ? value.package_key : undefined,
+        management_notice: typeof value.management_notice === 'string' ? value.management_notice : undefined,
+        period_end: positiveTimestamp(value.period_end),
+        scheduled_change: null,
+    };
+    let managementValid = value.can_manage !== undefined;
     if (value.scheduled_change !== undefined && value.scheduled_change !== null) {
         const change = value.scheduled_change;
-        if (!isObject(change) || (change.action !== 'cancel' && change.action !== 'downgrade')
-            || typeof change.package_name !== 'string' || !Number.isSafeInteger(change.effective_at) || Number(change.effective_at) <= 0) {
-            throw new Error('The website returned an invalid scheduled membership change. Please try again.');
+        const effectiveAt = isObject(change) ? positiveTimestamp(change.effective_at) : null;
+        if (isObject(change) && (change.action === 'cancel' || change.action === 'downgrade')
+            && typeof change.package_name === 'string' && effectiveAt) {
+            record.scheduled_change = { action: change.action, package_name: membershipDisplayName(change.package_name), effective_at: effectiveAt };
+        } else {
+            managementValid = false;
         }
-        scheduledChange = { action: change.action, package_name: membershipDisplayName(change.package_name), effective_at: Number(change.effective_at) };
     }
-    return {
-        package_name: membershipDisplayName(String(value.package_name)),
-        price: String(value.price), discount_price: String(value.discount_price),
-        status: String(value.status), payment_status: String(value.payment_status),
-        next_billing_date: value.next_billing_date as string | null,
-        cancel_date: value.cancel_date as string | null,
-        package_key: value.package_key as string | undefined,
-        revision: value.revision as string | undefined,
-        can_manage: value.can_manage as boolean | undefined,
-        management_notice: value.management_notice as string | undefined,
-        period_end: value.period_end as number | null | undefined,
-        scheduled_change: scheduledChange ?? null,
-    };
+    if (typeof value.can_manage !== 'boolean'
+        || typeof value.revision !== 'string' || !/^[a-f0-9]{64}$/.test(value.revision)
+        || (value.period_end !== undefined && value.period_end !== null && record.period_end === null)) {
+        managementValid = false;
+    }
+    if (managementValid) {
+        record.revision = value.revision as string;
+        record.can_manage = value.can_manage as boolean;
+    } else if (value.can_manage !== undefined) {
+        record.can_manage = false;
+    }
+    return record;
 }
 
 export function parseMembershipManagementResult(value: unknown): MembershipManagementResult {

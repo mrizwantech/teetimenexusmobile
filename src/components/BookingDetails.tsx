@@ -1,6 +1,8 @@
 import { Alert, Linking, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+
+import { getCurrentMembership } from '../api/membership';
 
 import { openAppleCalendar, openGoogleCalendar } from './CalendarCard';
 import { BayCard } from './BayCard';
@@ -34,6 +36,26 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
     const [inviteEmail, setInviteEmail] = useState('');
     const [invitePhone, setInvitePhone] = useState('');
     const [doorAccessVisible, setDoorAccessVisible] = useState(false);
+    const [isPaidMember, setIsPaidMember] = useState(false);
+
+    useFocusEffect(useCallback(() => {
+        let active = true;
+        getCurrentMembership()
+            .then((membership) => {
+                if (!active) return;
+                const paid = membership?.status === 'active' && membership.payment_status === 'paid';
+                setIsPaidMember(paid);
+                if (!paid) setDoorAccessVisible(false);
+            })
+            .catch(() => {
+                if (!active) return;
+                setIsPaidMember(false);
+                setDoorAccessVisible(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, []));
 
     function showAccessMessage() {
         setDoorAccessVisible(true);
@@ -79,14 +101,14 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
                 <DetailRow icon="♧" text={`${players} ${players === 1 ? 'Player' : 'Players'}`} />
             </View>
 
-            <View style={styles.accessCard}>
+            {isPaidMember ? <View style={styles.accessCard}>
                 <View style={styles.accessIcon}><Text style={styles.accessIconText}>▣</Text></View>
                 <View style={styles.accessCopy}>
                     <Text style={styles.accessTitle}>Access</Text>
                     <Text style={styles.accessBody}>Active, paid members can access the entrance from 15 minutes before their reservation until it ends.</Text>
                 </View>
                 <PrimaryButton label="Unlock Door" onPress={showAccessMessage} />
-            </View>
+            </View> : null}
 
             <View style={styles.actions}>
                 <ActionButton icon="calendar" label="Add to\nCalendar" onPress={() => Alert.alert('Add to Calendar', 'Choose a calendar', [
@@ -116,7 +138,7 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
             </Pressable>
             <BookingPolicyLink />
 
-            {doorAccessVisible ? <DoorAccess bookingId={bookingId} visible onClose={() => setDoorAccessVisible(false)} /> : null}
+            {isPaidMember && doorAccessVisible ? <DoorAccess bookingId={bookingId} visible onClose={() => setDoorAccessVisible(false)} /> : null}
         </>
     );
 }

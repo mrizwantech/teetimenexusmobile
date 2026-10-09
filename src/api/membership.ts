@@ -46,7 +46,9 @@ export function getMembershipPackages(forceRefresh = false): Promise<MembershipP
 }
 
 export async function getCurrentMembership(): Promise<MembershipRecord | null> {
-    return parseCurrentMembership(await apiRequest<unknown>('/wp-json/ttn/v1/membership/current', { cache: 'no-store' }));
+    // WordPress sends an empty body (not JSON null) when the account has no membership row.
+    const value = await apiRequest<unknown>('/wp-json/ttn/v1/membership/current', { cache: 'no-store' });
+    return parseCurrentMembership(value === undefined ? null : value);
 }
 
 export async function manageMembership(action: 'change' | 'cancel' | 'undo', membership: MembershipRecord, packageSlug?: string) {
