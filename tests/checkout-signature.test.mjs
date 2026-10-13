@@ -93,3 +93,10 @@ test('checkout bridges stroke state to native scrolling and resets on page loads
     assert.match(source, /onLoadStart=\{\(\) => setSigning\(false\)\}/);
     assert.match(source, /event\.nativeEvent\.data === CHECKOUT_SIGNATURE_END/);
 });
+
+test('checkout handles competing checkout failure URLs and confirmation redirects safely', () => {
+    const source = readFileSync(new URL('../src/app/checkout.tsx', import.meta.url), 'utf8');
+    assert.match(source, /booking_failed=1/);
+    assert.match(source, /booking=confirmed/);
+    assert.match(source, /order-received/);
+});

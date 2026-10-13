@@ -277,7 +277,15 @@ export default function BookScreen() {
         },
       });
     } catch (err) {
-      Alert.alert('Unable to continue', err instanceof Error ? err.message : 'Please try again.');
+      const message = err instanceof Error ? err.message : 'Please try again.';
+      Alert.alert('Unable to continue', message);
+      if (selectedBay && date) {
+        setTime(null);
+        getAvailability(selectedBay.name, formatDate(date))
+          .then((result) => setBookedTimes(result.booked_times))
+          .catch(() => {});
+        setCurrentStep(5);
+      }
     } finally {
       setContinuing(false);
     }

@@ -20,7 +20,18 @@ export default function CheckoutScreen() {
             router.replace({ pathname: '/manage-reservation', params: { bookingId: managementBookingId } });
             return;
         }
-        if (/[?&](success|payment_status)=(success|paid|complete)/i.test(url)) {
+        if (/[?&]booking_failed=1(?:&|$)/i.test(url)) {
+            const match = url.match(/[?&]alt_msg=([^&#]+)/i);
+            const altMsg = match ? decodeURIComponent(match[1]) : '';
+            const baseMsg = 'Someone was just a bit quicker than you to book this tee time. If your payment was processed, a full refund has been automatically issued.';
+            setError(altMsg ? `${baseMsg}\n\n${altMsg}` : `${baseMsg} Please choose another date or time.`);
+            return;
+        }
+        if (/[?&]booking_error=/i.test(url)) {
+            setError('This tee time is no longer available. If your payment was processed, a full refund has been issued. Please return and choose another date or time.');
+            return;
+        }
+        if (/[?&](success|payment_status)=(success|paid|complete)/i.test(url) || /[?&]booking=confirmed/i.test(url) || /\/order-received\//i.test(url)) {
             router.replace({ pathname: '/confirmation', params: { bay, date, time, duration, players } });
         }
     }
