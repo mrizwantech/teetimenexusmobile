@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { BookingRecord, getMyBookings } from '../api/account';
+import { isBookingUpcoming } from '../api/booking-rules';
 import { colors, radii, spacing } from '../theme';
 
 const bayImages = [
@@ -23,12 +24,19 @@ export function BookingList({ userId }: BookingListProps) {
     const [tab, setTab] = useState<BookingTab>('upcoming');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [now, setNow] = useState(() => Date.now());
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
+        if (!userId) return;
         let cancelled = false;
+        setLoading(true);
+        setError('');
         getMyBookings()
             .then((nextBookings) => {
-                if (!cancelled) setBookings(nextBookings);
+                if (!cancelled) {
+                    setNow(Date.now());
+                    setBookings(nextBookings);
+                }
             })
             .catch(() => {
                 if (!cancelled) setError('Unable to load your reservations.');
@@ -37,18 +45,17 @@ export function BookingList({ userId }: BookingListProps) {
                 if (!cancelled) setLoading(false);
             });
         return () => { cancelled = true; };
-    }, [userId]);
+    }, [userId]));
 
     const visibleBookings = useMemo(() => {
-        const today = new Date().toISOString().slice(0, 10);
-        return bookings.filter((booking) => tab === 'upcoming' ? booking.date >= today : booking.date < today);
-    }, [bookings, tab]);
+        return bookings.filter((booking) => (booking.status.toLowerCase() !== 'cancelled' && isBookingUpcoming(booking, now)) === (tab === 'upcoming'));
+    }, [bookings, now, tab]);
 
     return (
         <View style={styles.container}>
             <View style={styles.tabs}>
-                <Tab label="Upcoming" active={tab === 'upcoming'} onPress={() => setTab('upcoming')} />
-                <Tab label="Past" active={tab === 'past'} onPress={() => setTab('past')} />
+                <Tab label="Upcoming" active={tab === 'upcoming'} onPress={() => { setNow(Date.now()); setTab('upcoming'); }} />
+                <Tab label="Past" active={tab === 'past'} onPress={() => { setNow(Date.now()); setTab('past'); }} />
             </View>
             {loading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}

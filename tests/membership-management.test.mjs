@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { membershipDisplayName, parseCurrentMembership, parseMembershipManagementResult } from '../src/api/membership-rules.ts';
+import { isActivePaidMembership, membershipDisplayName, parseCurrentMembership, parseMembershipManagementResult } from '../src/api/membership-rules.ts';
 
 const record = {
   package_name: 'ALBATROSS', package_key: 'ALBATROSS', price: '499', discount_price: '399',
@@ -10,6 +10,28 @@ const record = {
   scheduled_change: null,
 };
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('Profile and Home show membership only for active paid members without fabricated labels', () => {
+  assert.equal(isActivePaidMembership(null), false);
+  for (const status of ['pending', 'cancelled', 'expired', 'inactive', '']) {
+    assert.equal(isActivePaidMembership(parseCurrentMembership({ ...record, status })), false);
+  }
+  for (const payment_status of ['pending', 'unpaid', 'failed', 'refunded', '']) {
+    assert.equal(isActivePaidMembership(parseCurrentMembership({ ...record, payment_status })), false);
+  }
+  assert.equal(isActivePaidMembership(parseCurrentMembership(record)), true);
+  assert.equal(isActivePaidMembership(parseCurrentMembership({ ...record, scheduled_change: {
+    action: 'cancel', package_name: 'ALBATROSS', effective_at: record.period_end,
+  } })), true);
+  for (const path of ['src/components/ProfileScreen.tsx', 'src/components/ProfileHome.tsx']) {
+    const source = read(path);
+    assert.match(source, /isActivePaidMembership\(membership\)/);
+    assert.match(source, /membership\.package_name/);
+    assert.match(source, /useFocusEffect/);
+    assert.match(source, /setMembership\(null\)/);
+    assert.doesNotMatch(source, /Founding Member|Your membership is ready/);
+  }
+});
 
 test('EAGLE is a display rename, not a change to the paid tier identifier', () => {
   assert.equal(membershipDisplayName('albatross'), 'EAGLE');

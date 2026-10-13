@@ -25,3 +25,14 @@ test('login offers password reset independently of login errors and uses the exi
   assert.match(link, /disabled=\{opening\}/);
   assert.match(link, /Alert\.alert\('Unable to open password reset'/);
 });
+
+test('login focuses on authentication without marketing heading or notification shortcut', () => {
+  const account = readFileSync(new URL('../src/app/account.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(account, /Your golf, organized|NOTIFICATION SETTINGS|href="\/notifications"|You can sign in with Apple using Hide My Email/);
+  assert.match(account, /<ForgotPasswordLink \/>/);
+  assert.doesNotMatch(account, /Sign in with a passkey|Additional sign-in options/);
+  assert.match(account, /AppleAuthentication\.AppleAuthenticationButton/);
+  const settings = readFileSync(new URL('../src/app/settings.tsx', import.meta.url), 'utf8');
+  assert.match(settings, /href="\/notifications"/);
+  assert.match(settings, /MANAGE NOTIFICATIONS/);
+});

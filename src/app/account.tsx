@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Link, router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 
@@ -33,6 +33,7 @@ export default function AccountScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const mountedRef = useRef(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -55,7 +56,8 @@ export default function AccountScreen() {
   }, []);
 
   async function handleLogin() {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setSubmitting(true);
     try {
@@ -68,12 +70,14 @@ export default function AccountScreen() {
     } catch (err) {
       if (mountedRef.current) setError(err instanceof Error ? err.message : 'Unable to log in.');
     } finally {
+      submittingRef.current = false;
       if (mountedRef.current) setSubmitting(false);
     }
   }
 
   async function handleAppleLogin() {
-    if (!mountedRef.current || submitting) return;
+    if (!mountedRef.current || submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setSubmitting(true);
     try {
@@ -100,16 +104,18 @@ export default function AccountScreen() {
       if (err && typeof err === 'object' && 'code' in err && err.code === 'ERR_REQUEST_CANCELED') return;
       if (mountedRef.current) setError(err instanceof Error ? err.message : 'Unable to sign in with Apple.');
     } finally {
+      submittingRef.current = false;
       if (mountedRef.current) setSubmitting(false);
     }
   }
 
   async function handleRegister() {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || submittingRef.current) return;
     if (!passwordMeetsPolicy(password)) {
       setError(PASSWORD_POLICY_MESSAGE);
       return;
     }
+    submittingRef.current = true;
     setError('');
     setSubmitting(true);
     try {
@@ -124,6 +130,7 @@ export default function AccountScreen() {
     } catch (err) {
       if (mountedRef.current) setError(err instanceof Error ? err.message : 'Unable to create your account.');
     } finally {
+      submittingRef.current = false;
       if (mountedRef.current) setSubmitting(false);
     }
   }
@@ -165,8 +172,6 @@ export default function AccountScreen() {
         <BrandMark />
         <Text style={styles.label}>ACCOUNT</Text>
       </ScreenHeader>
-      <Text style={styles.title}>Your golf, organized.</Text>
-      <Link href="/notifications" asChild><PrimaryButton label="NOTIFICATION SETTINGS" secondary /></Link>
       <SectionCard>
         <Text style={styles.cardTitle}>{isRegistering ? 'Create your account' : 'Log in'}</Text>
         <Text style={styles.body}>{isRegistering ? 'Create an account to manage bookings and memberships.' : 'Log in to manage bookings, view membership perks, and keep your history in one place.'}</Text>
@@ -217,7 +222,6 @@ export default function AccountScreen() {
           </Pressable>
         </View>
         {!isRegistering ? <ForgotPasswordLink /> : null}
-        {appleAvailable ? <Text style={styles.body}>You can sign in with Apple using Hide My Email. Before continuing with membership or door access, we require a verified non-relay contact email for access instructions and important account notices.</Text> : null}
         {isRegistering ? <PasswordRequirements password={password} /> : null}
         {isRegistering ? <>
           <Pressable style={styles.consentRow} onPress={() => setSmsOptIn((value) => !value)}>
@@ -229,7 +233,7 @@ export default function AccountScreen() {
             <Text style={styles.consentText}>Send me occasional Tee Time Nexus offers and updates.</Text>
           </Pressable>
         </> : null}
-        <PrimaryButton label={submitting ? 'Please wait…' : isRegistering ? 'Create account' : 'Log in'} onPress={isRegistering ? handleRegister : handleLogin} />
+        <PrimaryButton disabled={submitting} label={submitting ? 'Please wait…' : isRegistering ? 'Create account' : 'Log in'} onPress={isRegistering ? handleRegister : handleLogin} />
         {!isRegistering && appleAvailable ? (
           <View style={localStyles.appleSignIn}>
             <Text style={localStyles.divider}>OR</Text>
@@ -243,7 +247,7 @@ export default function AccountScreen() {
           </View>
         ) : null}
         <View style={{ marginTop: spacing.sm }}>
-          <PrimaryButton label={isRegistering ? 'I already have an account' : 'Create an account'} onPress={() => { setError(''); setIsRegistering((value) => !value); }} secondary />
+          <PrimaryButton disabled={submitting} label={isRegistering ? 'I already have an account' : 'Create an account'} onPress={() => { setError(''); setIsRegistering((value) => !value); }} secondary />
         </View>
       </SectionCard>
     </Screen>

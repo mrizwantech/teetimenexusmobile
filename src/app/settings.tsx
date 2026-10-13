@@ -31,6 +31,11 @@ export default function SettingsScreen() {
         <Text style={[styles.body, { fontSize: 14, lineHeight: 20 }]}>Manage push notifications and this device&apos;s notification permissions.</Text>
         <Link href="/notifications" asChild><PrimaryButton small label="MANAGE NOTIFICATIONS" /></Link>
       </SectionCard>
+      <SectionCard>
+        <Text style={styles.cardTitle}>Passkeys</Text>
+        <Text style={styles.body}>Sign in using your device&apos;s Face ID, fingerprint, or screen lock. Your password and Apple sign-in remain available.</Text>
+        <Link href="/passkeys" asChild><PrimaryButton small label="MANAGE PASSKEYS" /></Link>
+      </SectionCard>
     </Screen>
   );
 }

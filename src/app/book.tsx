@@ -2,8 +2,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Bay, getAvailability, getBays, getBookingOptions, TimeSlot } from '../api/booking';
-import { BookingOptions, isBookingDateAllowed } from '../api/booking-rules';
+import { Bay, getAvailability, getBays, getBookingOptions, getBookingQuote, getFreeHoursBalance, TimeSlot } from '../api/booking';
+import { BookingOptions, BookingQuote, FreeHoursBalance, isBookingDateAllowed } from '../api/booking-rules';
+import { BookingCalendar as InlineCalendar, formatBookingDate as formatDate, isDaySlotAvailable } from '../components/BookingCalendar';
 import { startCheckout } from '../api/checkout';
 import { BrandMark } from '../components/BrandMark';
 import { BayCard } from '../components/BayCard';
@@ -19,11 +20,13 @@ import { bookingStyles as styles } from '../theme';
 
 type BayType = 'right-handed' | 'left-handed';
 
-function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function formatMoney(amount: number): string {
+  return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
+}
+
+function formatBalanceDate(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function isBayVisibleForType(bay: Bay, bayType: BayType): boolean {
@@ -51,6 +54,8 @@ export default function BookScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [freeHours, setFreeHours] = useState<FreeHoursBalance | null>(null);
+  const [quote, setQuote] = useState<{ key: string; value?: BookingQuote; error?: string } | null>(null);
 
   const loadBookingOptions = useCallback(async () => {
     if (!user) return;
@@ -82,6 +87,26 @@ export default function BookScreen() {
     void loadBookingOptions();
     return () => { optionsRequestId.current += 1; };
   }, [loadBookingOptions]));
+
+  const balanceDate = date ? formatDate(date) : bookingOptions?.min_booking_date ?? null;
+
+  // bookingOptions is reloaded on focus, so returning from checkout refreshes the balance too.
+  useEffect(() => {
+    if (!balanceDate || !bookingOptions) return;
+    let cancelled = false;
+    getFreeHoursBalance(balanceDate)
+      .then((value) => {
+        if (!cancelled) setFreeHours(value);
+      })
+      .catch(() => {
+        if (!cancelled) setFreeHours(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [balanceDate, bookingOptions]);
+
+  const visibleFreeHours = freeHours && freeHours.date === balanceDate && freeHours.daily_allowance > 0 ? freeHours : null;
 
   const selectedBay = useMemo(() => bays.find((bay) => bay.key === bayKey) ?? null, [bays, bayKey]);
   const visibleBays = useMemo(() => (bayType ? bays.filter((bay) => isBayVisibleForType(bay, bayType)) : []), [bays, bayType]);
@@ -158,8 +183,29 @@ export default function BookScreen() {
     return true;
   }
 
-  const totalPrice = selectedBay && duration ? selectedBay.hourly_price * duration : 0;
+  const standardTotal = selectedBay && duration ? selectedBay.hourly_price * duration : 0;
   const selectionsComplete = Boolean(selectedBay && date && bookingOptions && isBookingDateAllowed(formatDate(date), bookingOptions) && duration && players && time);
+  const quoteKey = selectionsComplete && selectedBay && date && time && duration && players
+    ? JSON.stringify([selectedBay.name, formatDate(date), time, duration, players])
+    : null;
+  const currentQuote = quote && quote.key === quoteKey ? quote : null;
+
+  // The website prices member free hours and guest charges; the app only displays its quote.
+  useEffect(() => {
+    if (!quoteKey) return;
+    let cancelled = false;
+    const [bay, quoteDate, quoteTime, quoteDuration, quotePlayers] = JSON.parse(quoteKey) as [string, string, string, number, number];
+    getBookingQuote({ bay, date: quoteDate, time: quoteTime, duration: quoteDuration, players: quotePlayers })
+      .then((value) => {
+        if (!cancelled) setQuote({ key: quoteKey, value });
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setQuote({ key: quoteKey, error: error instanceof Error ? error.message : 'Unable to confirm your price.' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [quoteKey]);
   const readyToContinue = selectionsComplete;
   const bookingProgress = [
     Boolean(bayType),
@@ -176,8 +222,8 @@ export default function BookScreen() {
   }
 
   function selectDate(nextDate: Date) {
-    if (!bookingOptions || !isBookingDateAllowed(formatDate(nextDate), bookingOptions)) {
-      Alert.alert('Date unavailable', 'Please choose a date within your booking window.');
+    if (!bookingOptions || !isBookingDateAllowed(formatDate(nextDate), bookingOptions) || !isDaySlotAvailable(nextDate, bookingOptions.slots)) {
+      Alert.alert('Date unavailable', 'No tee times are available for this date. Please choose another date.');
       return;
     }
     setDate(nextDate);
@@ -249,6 +295,17 @@ export default function BookScreen() {
 
         <Text style={styles.title}>Book your session</Text>
 
+        {visibleFreeHours ? (
+          <View style={styles.freeHoursBanner} accessibilityRole="summary">
+            <Text style={styles.freeHoursLabel}>
+              FREE HOURS {visibleFreeHours.date === bookingOptions?.min_booking_date ? 'TODAY' : `· ${formatBalanceDate(visibleFreeHours.date).toUpperCase()}`}
+            </Text>
+            <Text style={styles.freeHoursValue}>
+              {visibleFreeHours.remaining} of {visibleFreeHours.daily_allowance} {visibleFreeHours.daily_allowance === 1 ? 'hour' : 'hours'} remaining
+            </Text>
+          </View>
+        ) : null}
+
         {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
         {loadError ? <PrimaryButton label="Retry booking options" onPress={() => void loadBookingOptions()} /> : null}
         {loadingOptions ? <Text style={styles.hint}>Loading booking options...</Text> : null}
@@ -309,21 +366,30 @@ export default function BookScreen() {
           {currentStep === 3 ? (
             <>
               <Text style={styles.sectionHeading}>Choose duration</Text>
-              <View style={styles.optionsWrap}>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
-                  <Pill
-                    key={hours}
-                    label={`${hours} ${hours === 1 ? 'Hour' : 'Hours'}`}
-                    selected={duration === hours}
-                    disabled={!isDurationAvailable(hours) || loadingAvailability}
-                    onPress={() => {
-                      setDuration(hours);
-                      setTime(null);
-                      setCurrentStep(4);
-                    }}
-                  />
-                ))}
-              </View>
+              {!loadingAvailability && !isDurationAvailable(1) ? (
+                <View style={{ marginTop: 8, gap: 12 }}>
+                  <Text style={styles.error}>
+                    No tee times are available on {date && formatDate(date)} for {selectedBay?.name}. Please choose another date.
+                  </Text>
+                  <PrimaryButton label="Choose another date" onPress={() => setCurrentStep(2)} />
+                </View>
+              ) : (
+                <View style={styles.optionsWrap}>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
+                    <Pill
+                      key={hours}
+                      label={`${hours} ${hours === 1 ? 'Hour' : 'Hours'}`}
+                      selected={duration === hours}
+                      disabled={!isDurationAvailable(hours) || loadingAvailability}
+                      onPress={() => {
+                        setDuration(hours);
+                        setTime(null);
+                        setCurrentStep(4);
+                      }}
+                    />
+                  ))}
+                </View>
+              )}
             </>
           ) : null}
 
@@ -371,7 +437,15 @@ export default function BookScreen() {
               <Text style={styles.summary}>
                 {selectedBay?.name} • {date && formatDate(date)} • {time} ({duration}h) • {players} {players === 1 ? 'player' : 'players'}
                 {'\n'}
-                <Text style={styles.summaryTotal}>Total: ${totalPrice}</Text>
+                <Text style={styles.summaryTotal}>
+                  {currentQuote?.value ? `Total: ${currentQuote.value.total === 0 ? 'FREE' : formatMoney(currentQuote.value.total)}`
+                    : currentQuote?.error ? `Standard rate: ${formatMoney(standardTotal)}`
+                    : 'Total: Calculating…'}
+                </Text>
+                {currentQuote?.value && currentQuote.value.member_free_hours > 0 && currentQuote.value.total > 0 ? `\nIncludes ${currentQuote.value.member_free_hours} free member ${currentQuote.value.member_free_hours === 1 ? 'hour' : 'hours'}` : null}
+                {currentQuote?.value && currentQuote.value.total === 0 && currentQuote.value.member_free_hours > 0 ? `\nCovered by ${currentQuote.value.member_free_hours} free member ${currentQuote.value.member_free_hours === 1 ? 'hour' : 'hours'}` : null}
+                {currentQuote?.value && currentQuote.value.member_guest_charge > 0 ? `\nIncludes ${formatMoney(currentQuote.value.member_guest_charge)} additional guest charge` : null}
+                {currentQuote?.error ? '\nMember free hours and guest charges are confirmed at checkout.' : null}
               </Text>
 
               <Text style={styles.sectionHeading}>Review your reservation</Text>
@@ -389,79 +463,6 @@ export default function BookScreen() {
         </SectionCard> : null}
       </> : null}
     </Screen>
-  );
-}
-
-function InlineCalendar({
-  month,
-  selectedDate,
-  bookingOptions,
-  onMonthChange,
-  onSelectDate,
-}: {
-  month: Date;
-  selectedDate: Date | null;
-  bookingOptions: BookingOptions;
-  onMonthChange: (month: Date) => void;
-  onSelectDate: (date: Date) => void;
-}) {
-  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
-  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const leadingDays = (firstDay.getDay() + 6) % 7;
-  const days = Array.from({ length: leadingDays + daysInMonth }, (_, index) => {
-    if (index < leadingDays) return null;
-    return new Date(month.getFullYear(), month.getMonth(), index - leadingDays + 1);
-  });
-  const monthKey = formatDate(month).slice(0, 7);
-  const canGoPrevious = monthKey > bookingOptions.min_booking_date.slice(0, 7);
-  const canGoNext = monthKey < bookingOptions.max_booking_date.slice(0, 7);
-
-  return (
-    <View style={styles.calendar}>
-      <View style={styles.calendarHeader}>
-        <Pressable
-          accessibilityLabel="Previous month"
-          accessibilityRole="button"
-          disabled={!canGoPrevious}
-          onPress={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-          style={[styles.monthButton, !canGoPrevious && styles.monthButtonDisabled]}
-        >
-          <Text style={styles.monthButtonText}>‹</Text>
-        </Pressable>
-        <Text style={styles.monthTitle}>{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
-        <Pressable
-          accessibilityLabel="Next month"
-          accessibilityRole="button"
-          disabled={!canGoNext}
-          onPress={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-          style={[styles.monthButton, !canGoNext && styles.monthButtonDisabled]}
-        >
-          <Text style={styles.monthButtonText}>›</Text>
-        </Pressable>
-      </View>
-      <View style={styles.weekRow}>
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => <Text key={`${day}-${index}`} style={styles.weekDay}>{day}</Text>)}
-      </View>
-      <View style={styles.calendarGrid}>
-        {days.map((day, index) => {
-          if (!day) return <View key={`empty-${index}`} style={styles.dayCell} />;
-          const isUnavailable = !isBookingDateAllowed(formatDate(day), bookingOptions);
-          const isSelected = selectedDate && formatDate(selectedDate) === formatDate(day);
-          return (
-            <Pressable
-              key={formatDate(day)}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: isUnavailable, selected: Boolean(isSelected) }}
-              disabled={isUnavailable}
-              onPress={() => onSelectDate(day)}
-              style={[styles.dayCell, isSelected && styles.selectedDay, isUnavailable && styles.pastDay]}
-            >
-              <Text style={[styles.dayText, isSelected && styles.selectedDayText, isUnavailable && styles.pastDayText]}>{day.getDate()}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
   );
 }
 

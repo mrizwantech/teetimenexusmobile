@@ -12,13 +12,25 @@ test('bottom navigation contains only Booking, Membership, and Menu', () => {
   ]);
 });
 
-test('sheet offers its destinations including Home and Profile once', () => {
-  assert.deepEqual(getMenuItems(), [
+test('signed-in sheet offers its destinations including Home and Profile once', () => {
+  assert.deepEqual(getMenuItems(true), [
     { label: 'Profile', path: '/account', kind: 'app' },
-    { label: 'Leagues & Tournaments', path: '/competitions', kind: 'app' },
-    { label: 'Membership', path: '/membership', kind: 'app' },
     { label: 'Home', path: '/', kind: 'app' },
+    { label: 'Leagues & Tournaments', path: '/competitions', kind: 'app' },
   ]);
+});
+
+test('guests see Login / Sign up instead of Profile and open the existing account screen', () => {
+  const items = getMenuItems(false);
+  assert.deepEqual(items[0], { label: 'Login / Sign up', path: '/account', kind: 'app' });
+  assert.deepEqual(items[1], { label: 'Home', path: '/', kind: 'app' });
+  assert.equal(items.some((item) => item.label === 'Profile'), false);
+  assert.equal(getMenuItems(true).some((item) => item.label === 'Login / Sign up'), false);
+  assert.deepEqual(getMenuItems(), items);
+  assert.deepEqual(items.slice(1), getMenuItems(true).slice(1));
+  const sheet = readFileSync(new URL('../src/components/MenuSheet.tsx', import.meta.url), 'utf8');
+  assert.match(sheet, /const \{ user \} = useAuth\(\)/);
+  assert.match(sheet, /getMenuItems\(Boolean\(user\)\)/);
 });
 
 test('Experience is omitted from the menu', () => {
@@ -39,7 +51,8 @@ test('menu combines competitions and omits removed destinations', () => {
     const items = getMenuItems();
     assert.equal(items.some((item) => item.path === '/book' || item.path === '/menu' || item.path === '/features' || item.kind === 'website'), false);
     assert.equal(items.filter((item) => item.path.startsWith('/competitions')).length, 1);
-    assert.equal(items.filter((item) => item.path === '/membership').length, 1);
+    assert.equal(items.filter((item) => item.path === '/membership').length, 0);
+    assert.equal(primaryNavigation.filter((item) => item.path === '/membership').length, 1);
     assert.equal(new Set(items.map((item) => item.label)).size, items.length);
 });
 
@@ -54,6 +67,8 @@ test('Menu uses a dismissible themed sheet with a two-column card grid and one b
   assert.match(menu, /bottom: bottomOffset/);
   assert.match(menu, /accessibilityLabel="Close menu"/);
   assert.match(menu, /\(gridWidth - spacing\.md\) \/ 2/);
+  assert.match(menu, /items = \[menuItems\[2\], menuItems\[0\], menuItems\[1\]\]/);
+  assert.match(menu, /index === 0 \? '100%'/);
   assert.doesNotMatch(menu, /<BottomNav/);
   assert.match(menu, /router\.navigate\(item\.path\)/);
 });
@@ -98,13 +113,13 @@ test('booking policies remain available to booking screens but are omitted from 
 });
 
 test('Home and Profile use native routes without restoring the old link list', () => {
-  const items = getMenuItems();
+  const items = getMenuItems(true);
   assert.equal(items.find((item) => item.label === 'Home').path, '/');
   assert.equal(items.find((item) => item.label === 'Profile').path, '/account');
   for (const path of ['/hours', '/reservations', 'https://teetimenexus.com/about-us/', '/notifications', '/settings', bookingPolicyUrl]) {
     assert.equal(items.some((item) => item.path === path), false);
   }
-  assert.equal(items.length, 4);
+  assert.equal(items.length, 3);
   const menu = readFileSync(new URL('../src/components/MenuSheet.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(menu, /styles\.links|styles\.linkTitle|items\.slice/);
 });

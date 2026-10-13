@@ -6,10 +6,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark } from '../components/BrandMark';
 import { NavigationIcon } from '../components/NavigationIcon';
 import { getMenuItems } from '../navigation/menu';
+import { useAuth } from '../context/AuthContext';
 import { colors, radii, spacing } from '../theme';
 
 type MenuItem = ReturnType<typeof getMenuItems>[number];
-const cardIcons = ['profile', 'tournament', 'membership', 'home'] as const;
+const cardIcons = ['tournament', 'profile', 'home'] as const;
 
 export function MenuSheet({ visible, bottomOffset, onClose, onNavigate }: {
   visible: boolean;
@@ -18,10 +19,12 @@ export function MenuSheet({ visible, bottomOffset, onClose, onNavigate }: {
   onNavigate?: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [gridWidth, setGridWidth] = useState(0);
   const [sheetHeight, setSheetHeight] = useState(0);
   const [progress] = useState(() => new Animated.Value(0));
-  const items = getMenuItems();
+  const menuItems = getMenuItems(Boolean(user));
+  const items = [menuItems[2], menuItems[0], menuItems[1]];
 
   useEffect(() => {
     if (!sheetHeight) return;
@@ -61,7 +64,7 @@ export function MenuSheet({ visible, bottomOffset, onClose, onNavigate }: {
           <Text style={styles.title}>Explore Tee Time Nexus</Text>
           <View style={styles.grid} onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}>
             {items.map((item, index) => (
-              <Pressable key={item.path} accessibilityRole="button" accessibilityLabel={item.label} onPress={() => openItem(item)} style={({ pressed }) => [styles.card, { width: gridWidth ? Math.max(1, (gridWidth - spacing.md) / 2) : '45%' }, pressed && styles.pressed]}>
+              <Pressable key={item.path} accessibilityRole="button" accessibilityLabel={item.label} onPress={() => openItem(item)} style={({ pressed }) => [styles.card, { width: index === 0 ? '100%' : gridWidth ? Math.max(1, (gridWidth - spacing.md) / 2) : '45%' }, pressed && styles.pressed]}>
                 <NavigationIcon name={cardIcons[index]} active />
                 <Text style={styles.cardTitle}>{item.label}</Text>
               </Pressable>

@@ -51,8 +51,9 @@ test('reservation ID is wired through every door access surface and fake access 
   const details = read('src/components/BookingDetails.tsx');
   assert.match(details, /<DoorAccess bookingId=\{bookingId\}/);
   assert.match(details, /membership\?\.status === 'active' && membership\.payment_status === 'paid'/);
-  assert.match(details, /\{isPaidMember \? <View style=\{styles\.accessCard\}>/);
-  assert.match(details, /\{isPaidMember && doorAccessVisible \? <DoorAccess/);
+  assert.match(details, /const showDoorAccess = isPaidMember && !hasEnded && !isCancelled;/);
+  assert.match(details, /\{showDoorAccess \? <View style=\{styles\.accessCard\}>/);
+  assert.match(details, /\{showDoorAccess && doorAccessVisible \? <DoorAccess/);
   const door = read('src/components/DoorAccess.tsx');
   assert.doesNotMatch(door, /5327|14 \* 60 \+ 32|accessCode|Door Access Code/);
   assert.match(door, /createDoorCredential\(bookingId\)/);
@@ -143,4 +144,31 @@ test('reader discovery never suppresses permission errors or cancellation', asyn
     }), (failure) => failure === error);
     assert.equal(attempts, 1);
   }
+});
+
+test('booking end time parses venue slot labels and rejects malformed values', async () => {
+  const { bookingEndTime } = await import('../src/api/booking-rules.ts');
+  assert.equal(bookingEndTime('2026-10-08', '2:00 PM', 2), new Date(2026, 9, 8, 16, 0).getTime());
+  assert.equal(bookingEndTime('2026-10-08', '12:00 AM', 1), new Date(2026, 9, 8, 1, 0).getTime());
+  assert.equal(bookingEndTime('2026-10-08', '12:00 PM', 1), new Date(2026, 9, 8, 13, 0).getTime());
+  assert.equal(bookingEndTime('2026-10-08', '23:00', 1), new Date(2026, 9, 9, 0, 0).getTime());
+  for (const [date, time, duration] of [['2026-02-30', '2:00 PM', 1], ['10/08/2026', '2:00 PM', 1], ['2026-10-08', '13:00 PM', 1], ['2026-10-08', 'soon', 1], ['2026-10-08', '2:00 PM', 0]]) {
+    assert.equal(bookingEndTime(date, time, duration), null);
+  }
+});
+
+test('reservations move to Past when they end, not at UTC midnight', async () => {
+  const { isBookingUpcoming, nextUpcomingBooking } = await import('../src/api/booking-rules.ts');
+  const now = new Date(2026, 9, 9, 0, 7).getTime();
+  const ended = { date: '2026-10-08', time: '10:00 PM', duration: 2 };
+  const later = { date: '2026-10-09', time: '6:00 PM', duration: 1 };
+  const soon = { date: '2026-10-09', time: '9:00 AM', duration: 1 };
+  assert.equal(isBookingUpcoming(ended, now), false);
+  assert.equal(isBookingUpcoming({ ...ended, time: '11:00 PM' }, now), true);
+  assert.equal(isBookingUpcoming({ date: '2026-10-09', time: 'TBD', duration: 1 }, now), true);
+  assert.equal(nextUpcomingBooking([ended, later, soon], now), soon);
+  assert.equal(nextUpcomingBooking([ended], now), undefined);
+  assert.match(read('src/components/BookingList.tsx'), /isBookingUpcoming\(booking, now\)/);
+  assert.doesNotMatch(read('src/components/BookingList.tsx'), /toISOString/);
+  assert.match(read('src/components/ProfileHome.tsx'), /nextUpcomingBooking\(bookings\)/);
 });

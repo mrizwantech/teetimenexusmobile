@@ -1,4 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
+import { getNativePasskey, passkeyPlatform } from './passkey-native';
+import { parsePasskeyLoginOptions, parsePasskeySession } from './passkey-rules';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://teetimenexus.com';
 
@@ -90,6 +92,31 @@ export async function login(username: string, password: string): Promise<LoginRe
     const data = await parseJsonResponse<LoginResponse>(response);
     await storeTokens(data);
     return data;
+}
+
+export async function loginWithPasskey(options?: { immediate?: boolean }): Promise<LoginResponse | null> {
+    const platform = passkeyPlatform();
+    async function request(path: string, body: unknown): Promise<unknown> {
+        const response = await fetch(`${API_BASE_URL}/wp-json/ttn/v1/auth/passkeys/login/${path}`, {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error(await parseErrorMessage(response));
+        return parseJsonResponse<unknown>(response);
+    }
+    try {
+        const loginOptions = parsePasskeyLoginOptions(await request('options', { platform }));
+        const credential = await getNativePasskey(loginOptions.request, options);
+        const data = parsePasskeySession(await request('verify', { challenge_id: loginOptions.challengeId, credential }));
+        await storeTokens(data);
+        return data;
+    } catch (error) {
+        if (options?.immediate) {
+            return null;
+        }
+        throw error;
+    }
 }
 
 export async function registerAccount(params: {

@@ -11,6 +11,10 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.teetimenexus.app",
+      "appleTeamId": "437X3V3YF8",
+      "associatedDomains": [
+        "webcredentials:teetimenexus.com"
+      ],
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Use Bluetooth to unlock the entrance with your phone during an eligible member booking.",
@@ -44,6 +48,14 @@
       "expo-status-bar",
       "@react-native-community/datetimepicker",
       "expo-web-browser",
+      [
+        "expo-calendar",
+        {
+          "writeOnlyAccess": true,
+          "calendarPermission": "Allow Tee Time Nexus to add your reservation to your calendar.",
+          "writeOnlyCalendarPermission": "Allow Tee Time Nexus to add your reservation to your calendar."
+        }
+      ],
       [
         "expo-build-properties",
         {

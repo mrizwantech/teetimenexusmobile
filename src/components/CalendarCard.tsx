@@ -1,5 +1,6 @@
-import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getCalendarEvent, getGoogleCalendarUrl } from '../api/calendar-rules';
 import { colors, radii, spacing } from '../theme';
 
 type CalendarCardProps = {
@@ -10,29 +11,19 @@ type CalendarCardProps = {
     players: number;
 };
 
-export function getCalendarStartDate(date: string, time: string): Date {
-    const [year, month, day] = date.split('-').map(Number);
-    const [hour, minute] = time.split(':').map(Number);
-    return new Date(year, month - 1, day, hour, minute);
-}
-
-function formatGoogleDate(date: Date): string {
-    return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-}
-
 export function CalendarCard({ bay, date, time, duration, players }: CalendarCardProps) {
     return (
         <View style={styles.card}>
-            want             <Text style={styles.title}>Add to Calendar</Text>
+            <Text style={styles.title}>Add to Calendar</Text>
             <Text style={styles.subtitle}>{bay} · {date} at {time}</Text>
             <View style={styles.actions}>
                 {Platform.OS === 'ios' ? (
-                    <Pressable accessibilityRole="button" onPress={() => openAppleCalendar(date, time)} style={styles.action}>
+                    <Pressable accessibilityRole="button" onPress={() => { void openAppleCalendar(bay, date, time, duration, players); }} style={styles.action}>
                         <Text style={styles.icon}>▣</Text>
                         <Text style={styles.actionText}>Apple Calendar</Text>
                     </Pressable>
                 ) : null}
-                <Pressable accessibilityRole="button" onPress={() => openGoogleCalendar(bay, date, time, duration, players)} style={styles.action}>
+                <Pressable accessibilityRole="button" onPress={() => { void openGoogleCalendar(bay, date, time, duration, players); }} style={styles.action}>
                     <Text style={styles.icon}>▣</Text>
                     <Text style={styles.actionText}>Google Calendar</Text>
                 </Pressable>
@@ -41,21 +32,33 @@ export function CalendarCard({ bay, date, time, duration, players }: CalendarCar
     );
 }
 
-export function openGoogleCalendar(bay: string, date: string, time: string, duration: number, players: number) {
-    const start = getCalendarStartDate(date, time);
-    const end = new Date(start.getTime() + duration * 60 * 60 * 1000);
-    const params = new URLSearchParams({
-        action: 'TEMPLATE',
-        text: `Tee Time Nexus - ${bay}`,
-        dates: `${formatGoogleDate(start)}/${formatGoogleDate(end)}`,
-        details: `${players} ${players === 1 ? 'player' : 'players'} · ${duration} hour${duration === 1 ? '' : 's'}`,
-        location: 'Tee Time Nexus',
-    });
-    Linking.openURL(`https://calendar.google.com/calendar/render?${params.toString()}`);
+export async function openGoogleCalendar(bay: string, date: string, time: string, duration: number, players: number) {
+    try {
+        await Linking.openURL(getGoogleCalendarUrl(bay, date, time, duration, players));
+    } catch (error) {
+        Alert.alert('Unable to open Google Calendar', error instanceof Error ? error.message : 'Please try again.');
+    }
 }
 
-export function openAppleCalendar(date: string, time: string) {
-    Linking.openURL(`calshow:${getCalendarStartDate(date, time).getTime()}`);
+export async function openAppleCalendar(bay: string, date: string, time: string, duration: number, players: number) {
+    try {
+        if (Platform.OS !== 'ios') throw new Error('Apple Calendar is available on iPhone and iPad. Please use Google Calendar.');
+        const event = getCalendarEvent(bay, date, time, duration, players);
+        const Calendar = await import('expo-calendar');
+        const permission = await Calendar.requestCalendarPermissions(true);
+        if (!permission.granted) {
+            Alert.alert('Calendar permission needed', 'Allow Tee Time Nexus to add calendar events in device settings.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => {
+                    Linking.openSettings().catch(() => Alert.alert('Unable to open settings', 'Open your device Settings app to change calendar access.'));
+                } },
+            ]);
+            return;
+        }
+        await Calendar.getDefaultCalendarSync().addEventWithForm(event);
+    } catch (error) {
+        Alert.alert('Unable to open Apple Calendar', error instanceof Error ? error.message : 'Please try again.');
+    }
 }
 
 const styles = StyleSheet.create({

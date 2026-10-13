@@ -67,8 +67,35 @@ test('booking uses uncached authenticated options and enforces both calendar bou
   assert.match(screen, /useFocusEffect\(useCallback/);
   assert.match(screen, /getBays\(\), getBookingOptions\(\)/);
   assert.doesNotMatch(screen, /getTimeSlots/);
-  assert.match(screen, /isUnavailable = !isBookingDateAllowed/);
-  assert.match(screen, /disabled=\{isUnavailable\}/);
-  assert.match(screen, /disabled=\{!canGoNext\}/);
+  const calendar = readFileSync(new URL('../src/components/BookingCalendar.tsx', import.meta.url), 'utf8');
+  assert.match(calendar, /isUnavailable = !isBookingDateAllowed/);
+  assert.match(calendar, /disabled=\{isUnavailable\}/);
+  assert.match(calendar, /disabled=\{!canGoNext\}/);
   assert.match(screen, /Retry booking options/);
+});
+
+test('booking total comes from the website quote, including member free hours', async () => {
+  const { parseBookingQuote } = await import('../src/api/booking-rules.ts');
+  const quote = { hourly_price: 60, duration: 1, member_free_hours: 1, member_guest_charge: 0, total: 0, member_package: 'ALBATROSS' };
+  assert.equal(parseBookingQuote(quote, 1).total, 0);
+  for (const value of [null, { ...quote, total: -1 }, { ...quote, duration: 2 }, { ...quote, member_free_hours: 2 }, { ...quote, total: '0' }, { ...quote, member_package: null }]) {
+    assert.throws(() => parseBookingQuote(value, 1));
+  }
+  const screen = readFileSync(new URL('../src/app/book.tsx', import.meta.url), 'utf8');
+  assert.match(screen, /getBookingQuote\(/);
+  assert.match(screen, /currentQuote\.value\.total/);
+  assert.doesNotMatch(screen, /Total: \$\{totalPrice\}/);
+});
+
+test('members see the website free-hour balance and FREE totals', async () => {
+  const { parseFreeHoursBalance } = await import('../src/api/booking-rules.ts');
+  const balance = { date: '2026-10-09', daily_allowance: 2, used: 1, remaining: 1 };
+  assert.deepEqual(parseFreeHoursBalance(balance, '2026-10-09'), balance);
+  for (const value of [null, { ...balance, date: '2026-10-10' }, { ...balance, remaining: 3 }, { ...balance, used: -1 }, { ...balance, remaining: '1' }]) {
+    assert.throws(() => parseFreeHoursBalance(value, '2026-10-09'));
+  }
+  const screen = readFileSync(new URL('../src/app/book.tsx', import.meta.url), 'utf8');
+  assert.match(screen, /getFreeHoursBalance\(balanceDate\)/);
+  assert.match(screen, /daily_allowance > 0/);
+  assert.match(screen, /total === 0 \? 'FREE'/);
 });

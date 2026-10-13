@@ -1,7 +1,7 @@
 import { apiRequest } from './client';
 import { isRecord } from './home-content';
 import { getCachedPublicContent, PUBLIC_CONTENT_CACHE_MAX_AGE_MS } from './public-content-cache';
-import { parseBookingOptions } from './booking-rules';
+import { parseBookingOptions, parseBookingQuote, parseFreeHoursBalance } from './booking-rules';
 
 export type Bay = {
     key: string;
@@ -71,4 +71,14 @@ export async function getBookingOptions() {
 export function getAvailability(bay: string, date: string): Promise<{ booked_times: string[] }> {
     const query = new URLSearchParams({ bay, date }).toString();
     return apiRequest<{ booked_times: string[] }>(`/wp-json/ttn/v1/availability?${query}`);
+}
+
+export async function getBookingQuote(params: { bay: string; date: string; time: string; duration: number; players: number }) {
+    const query = new URLSearchParams({ ...params, duration: String(params.duration), players: String(params.players) }).toString();
+    return parseBookingQuote(await apiRequest<unknown>(`/wp-json/ttn/v1/booking-quote?${query}`, { cache: 'no-store' }), params.duration);
+}
+
+export async function getFreeHoursBalance(date: string) {
+    const query = new URLSearchParams({ date }).toString();
+    return parseFreeHoursBalance(await apiRequest<unknown>(`/wp-json/ttn/v1/member/free-hours?${query}`, { cache: 'no-store' }), date);
 }

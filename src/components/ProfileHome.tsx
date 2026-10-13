@@ -4,6 +4,8 @@ import { Link, useFocusEffect } from 'expo-router';
 
 import { AuthUser } from '../api/auth';
 import { BookingRecord, getMyBookings, getMyMembership } from '../api/account';
+import { nextUpcomingBooking } from '../api/booking-rules';
+import { isActivePaidMembership } from '../api/membership-rules';
 import { PrimaryButton } from './PrimaryButton';
 import { colors, radii, spacing } from '../theme';
 
@@ -22,6 +24,7 @@ export function ProfileHome({ user }: ProfileHomeProps) {
         let cancelled = false;
         setIsLoading(true);
         setError('');
+        setMembership(null);
         Promise.all([getMyBookings(), getMyMembership()])
             .then(([nextBookings, nextMembership]) => {
                 if (!cancelled) {
@@ -46,9 +49,7 @@ export function ProfileHome({ user }: ProfileHomeProps) {
     const firstName = user.display_name.trim().split(/\s+/)[0] || 'Golfer';
     const hour = new Date().getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-    const upcomingBooking = bookings[0];
-    const membershipName = membership?.package_name || 'Founding Member';
-    const membershipStatus = membership?.status || 'Your membership is ready when you are.';
+    const upcomingBooking = nextUpcomingBooking(bookings);
 
     return (
         <View style={styles.container}>
@@ -99,16 +100,16 @@ export function ProfileHome({ user }: ProfileHomeProps) {
                 )}
             </View>
 
-            <View style={styles.panel}>
+            {!isLoading && !error && isActivePaidMembership(membership) ? <View style={styles.panel}>
                 <View style={styles.membershipRow}>
                     <View style={styles.membershipIcon}><Text style={styles.membershipIconText}>✦</Text></View>
                     <View style={styles.membershipCopy}>
-                        <Text style={styles.membershipTitle}>{membershipName}</Text>
-                        <Text style={styles.membershipMeta}>{membershipStatus}</Text>
+                        <Text style={styles.membershipTitle}>{membership.package_name}</Text>
+                        <Text style={styles.membershipMeta}>{membership.status}</Text>
                     </View>
                     <Link href="/membership"><Text style={styles.panelLink}>Manage membership</Text></Link>
                 </View>
-            </View>
+            </View> : null}
 
         </View>
     );

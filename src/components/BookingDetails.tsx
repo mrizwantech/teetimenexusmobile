@@ -1,7 +1,8 @@
-import { Alert, Linking, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
+import { bookingEndTime } from '../api/booking-rules';
 import { getCurrentMembership } from '../api/membership';
 
 import { openAppleCalendar, openGoogleCalendar } from './CalendarCard';
@@ -20,6 +21,7 @@ type BookingDetailsProps = {
     time: string;
     duration: number;
     players: number;
+    status?: string;
     bayIndex?: number;
 };
 
@@ -29,7 +31,7 @@ function formatReservationDate(date: string): string {
     return parsedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function BookingDetails({ bookingId, bay, date, time, duration, players, bayIndex = 0 }: BookingDetailsProps) {
+export function BookingDetails({ bookingId, bay, date, time, duration, players, status = 'confirmed', bayIndex = 0 }: BookingDetailsProps) {
     const bayRecord = { key: bay, name: bay, type: 'dual' as const, location: 'Tee Time Nexus', premium: false, hourly_price: 0 };
     const [inviteVisible, setInviteVisible] = useState(false);
     const [inviteName, setInviteName] = useState('');
@@ -37,6 +39,26 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
     const [invitePhone, setInvitePhone] = useState('');
     const [doorAccessVisible, setDoorAccessVisible] = useState(false);
     const [isPaidMember, setIsPaidMember] = useState(false);
+    const endsAt = bookingEndTime(date, time, duration);
+    const [now, setNow] = useState(() => Date.now());
+    const hasEnded = endsAt !== null && now >= endsAt;
+
+    useFocusEffect(useCallback(() => {
+        setNow(Date.now());
+    }, []));
+
+    useEffect(() => {
+        if (endsAt === null || hasEnded) return;
+        // setTimeout overflows above ~24.8 days; the focus refresh covers longer waits.
+        const timer = setTimeout(() => {
+            const current = Date.now();
+            setNow(current);
+            if (current >= endsAt) setDoorAccessVisible(false);
+        }, Math.min(endsAt - Date.now() + 1000, 2_147_483_647));
+        return () => clearTimeout(timer);
+    }, [endsAt, hasEnded, now]);
+    const isCancelled = status.toLowerCase() === 'cancelled';
+    const showDoorAccess = isPaidMember && !hasEnded && !isCancelled;
 
     useFocusEffect(useCallback(() => {
         let active = true;
@@ -96,12 +118,13 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
             </View>
 
             <View style={styles.detailsCard}>
+                {isCancelled ? <Text style={styles.accessBody}>Reservation cancelled</Text> : null}
                 <DetailRow icon="▣" text={formatReservationDate(date)} />
                 <DetailRow icon="◷" text={`${time} - ${time} (${duration} hour${duration === 1 ? '' : 's'})`} />
                 <DetailRow icon="♧" text={`${players} ${players === 1 ? 'Player' : 'Players'}`} />
             </View>
 
-            {isPaidMember ? <View style={styles.accessCard}>
+            {showDoorAccess ? <View style={styles.accessCard}>
                 <View style={styles.accessIcon}><Text style={styles.accessIconText}>▣</Text></View>
                 <View style={styles.accessCopy}>
                     <Text style={styles.accessTitle}>Access</Text>
@@ -112,7 +135,7 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
 
             <View style={styles.actions}>
                 <ActionButton icon="calendar" label="Add to\nCalendar" onPress={() => Alert.alert('Add to Calendar', 'Choose a calendar', [
-                    { text: 'Apple Calendar', onPress: () => openAppleCalendar(date, time) },
+                    ...(Platform.OS === 'ios' ? [{ text: 'Apple Calendar', onPress: () => { void openAppleCalendar(bay, date, time, duration, players); } }] : []),
                     { text: 'Google Calendar', onPress: () => openGoogleCalendar(bay, date, time, duration, players) },
                     { text: 'Cancel', style: 'cancel' },
                 ])} />
@@ -133,12 +156,12 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
                 </View>
             </Modal>
 
-            <Pressable accessibilityRole="button" onPress={() => Alert.alert('Cancel or reschedule', 'Please contact Tee Time Nexus support to change this reservation.')}>
+            {!isCancelled ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/manage-reservation', params: { bookingId: String(bookingId) } })}>
                 <Text style={styles.cancel}>Cancel / Reschedule</Text>
-            </Pressable>
+            </Pressable> : null}
             <BookingPolicyLink />
 
-            {isPaidMember && doorAccessVisible ? <DoorAccess bookingId={bookingId} visible onClose={() => setDoorAccessVisible(false)} /> : null}
+            {showDoorAccess && doorAccessVisible ? <DoorAccess bookingId={bookingId} visible onClose={() => setDoorAccessVisible(false)} /> : null}
         </>
     );
 }

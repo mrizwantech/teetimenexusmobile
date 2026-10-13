@@ -9,6 +9,7 @@ import {
     hasStoredSession,
     login as apiLogin,
     loginWithApple as apiLoginWithApple,
+    loginWithPasskey as apiLoginWithPasskey,
     logout as apiLogout,
     refreshAccessToken,
     registerAccount as apiRegisterAccount,
@@ -17,7 +18,9 @@ import {
 type AuthContextValue = {
     user: AuthUser | null;
     isLoading: boolean;
+    signInSequence: number;
     login: (username: string, password: string) => Promise<void>;
+    loginWithPasskey: (options?: { immediate?: boolean }) => Promise<boolean>;
     loginWithApple: (identityToken: string, nonce: string, name?: string, givenName?: string, familyName?: string) => Promise<void>;
     register: (params: { name: string; email: string; password: string; phone?: string; smsOptIn?: boolean; promoOptIn?: boolean }) => Promise<boolean>;
     logout: () => Promise<void>;
@@ -29,6 +32,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: PropsWithChildren) {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [signInSequence, setSignInSequence] = useState(0);
     const mountedRef = useRef(false);
 
     useEffect(() => {
@@ -58,24 +62,46 @@ export function AuthProvider({ children }: PropsWithChildren) {
         () => ({
             user,
             isLoading,
+            signInSequence,
             login: async (username, password) => {
                 const result = await apiLogin(username, password);
-                if (mountedRef.current) setUser(result.user);
+                if (mountedRef.current) {
+                    setUser(result.user);
+                    setSignInSequence((value) => value + 1);
+                }
+            },
+            loginWithPasskey: async (options) => {
+                const result = options ? await apiLoginWithPasskey(options) : await apiLoginWithPasskey();
+                if (result && mountedRef.current) {
+                    setUser(result.user);
+                    setSignInSequence(0);
+                    return true;
+                }
+                return false;
             },
             loginWithApple: async (identityToken, nonce, name, givenName, familyName) => {
                 const result = await apiLoginWithApple({ identityToken, nonce, name, givenName, familyName });
-                if (mountedRef.current) setUser(result.user);
+                if (mountedRef.current) {
+                    setUser(result.user);
+                    setSignInSequence((value) => value + 1);
+                }
             },
             register: async (params) => {
                 const result = await apiRegisterAccount(params);
-                if (mountedRef.current) setUser(result.user);
+                if (mountedRef.current) {
+                    setUser(result.user);
+                    setSignInSequence((value) => value + 1);
+                }
                 return result.welcome_email_sent === true;
             },
             logout: async () => {
                 await releasePushDevice();
                 await clearKisiCredentials();
                 await apiLogout();
-                if (mountedRef.current) setUser(null);
+                if (mountedRef.current) {
+                    setUser(null);
+                    setSignInSequence(0);
+                }
             },
             refreshUser: async () => {
                 const accessToken = await getAccessToken();
@@ -84,7 +110,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 if (mountedRef.current) setUser(updatedUser);
             },
         }),
-        [user, isLoading]
+        [user, isLoading, signInSequence]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

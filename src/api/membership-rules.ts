@@ -22,6 +22,10 @@ export type MembershipManagementResult =
     | { bridge_url: string }
     | { message: string; membership: MembershipRecord };
 
+export function isActivePaidMembership(membership: MembershipRecord | null): membership is MembershipRecord {
+    return membership?.status === 'active' && membership.payment_status === 'paid';
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
