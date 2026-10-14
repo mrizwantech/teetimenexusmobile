@@ -35,6 +35,7 @@
 
 ### 🎨 Typography, Layout & Styling
 - Readability improvements with high-contrast text (`#F5F5F5`), 17pt font sizing with 26pt line height, and responsive card padding.
+- The Home slider shows one slide across the available content width on tablet layouts (600 points or wider), instead of multiple narrow panels. Phones and narrow split-screen layouts retain the next-slide preview. Swipe and pagination remain available in portrait and landscape.
 
 ---
 
