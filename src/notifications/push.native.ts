@@ -23,7 +23,8 @@ export async function readPushState(requestPermission = false): Promise<PushStat
       { id: 'ttn-marketing', name: 'Offers and news', description: 'Promotions and club news you opted into.', importance: notifications.AndroidImportance.LOW },
       { id: 'ttn-updates', name: 'Tee Time Nexus updates', description: 'General updates.', importance: notifications.AndroidImportance.HIGH },
     ];
-    await Promise.all(channels.map(({ id, ...channel }) => notifications.setNotificationChannelAsync(id, { ...channel, sound: 'default' })));
+    // Omitting `sound` uses the system default; on Android a string is resolved as a bundled raw sound file.
+    await Promise.all(channels.map(({ id, ...channel }) => notifications.setNotificationChannelAsync(id, channel)));
   }
   const settings = requestPermission
     ? await notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowBadge: true, allowSound: true } })

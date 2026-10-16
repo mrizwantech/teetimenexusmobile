@@ -59,6 +59,10 @@
       [
         "expo-build-properties",
         {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          },
           "ios": {
             "enableSceneSupport": true,
             "useFrameworks": "dynamic"
@@ -83,7 +87,9 @@
           "defaultChannel": "ttn-updates",
           "color": "#A1E04C"
         }
-      ]
+      ],
+      "./plugins/with-firebase-notification-manifest",
+      "./plugins/with-android-release-optimization"
     ],
     "extra": {
       "kisi": {
