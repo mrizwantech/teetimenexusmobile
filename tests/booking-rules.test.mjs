@@ -65,13 +65,25 @@ test('booking uses uncached authenticated options and enforces both calendar bou
   assert.match(api, /parseBookingOptions\(await apiRequest<unknown>\('\/wp-json\/ttn\/v1\/member\/time-slots'\)\)/);
   const screen = readFileSync(new URL('../src/app/book.tsx', import.meta.url), 'utf8');
   assert.match(screen, /useFocusEffect\(useCallback/);
-  assert.match(screen, /getBays\(\), getBookingOptions\(\)/);
+  assert.match(screen, /getBays\(\)\.then/);
+  assert.match(screen, /getBookingOptions\(\)\.then/);
   assert.doesNotMatch(screen, /getTimeSlots/);
   const calendar = readFileSync(new URL('../src/components/BookingCalendar.tsx', import.meta.url), 'utf8');
   assert.match(calendar, /isUnavailable = !isBookingDateAllowed/);
   assert.match(calendar, /disabled=\{isUnavailable\}/);
   assert.match(calendar, /disabled=\{!canGoNext\}/);
   assert.match(screen, /Retry booking options/);
+});
+
+test('cached bay selection does not wait for fresh booking rules and listens for content updates', () => {
+  const screen = readFileSync(new URL('../src/app/book.tsx', import.meta.url), 'utf8');
+  assert.match(screen, /Promise\.allSettled/);
+  assert.match(screen, /usePublicContentUpdate<Bay\[\]>\('bays', setBays\)/);
+  assert.match(screen, /currentStep <= 1 \|\| \(bookingOptions && !loadingOptions && !loadError\)/);
+  assert.match(screen, /currentStep === 2 && bookingOptions/);
+  assert.doesNotMatch(screen, /setBays\(\[\]\)/);
+  const api = readFileSync(new URL('../src/api/booking.ts', import.meta.url), 'utf8');
+  assert.match(api, /publicContentCache\.define\('bays'/);
 });
 
 test('booking total comes from the website quote, including member free hours', async () => {

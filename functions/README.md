@@ -54,6 +54,51 @@ The app caches public website content (home, hours, competitions, bays, time slo
 
 Purge any WordPress/CDN cache for the changed pages first; the app requests with `cache: 'no-store'`, but a CDN can still serve an old response.
 
+### Automatic refresh after a release
+
+`npm run release` displays the local app/package versions and the Firebase content
+version, then asks for the next app version (for example, `1.2.0`). You can also
+pass it directly with `npm run release -- 1.2.0`; current versions are still shown.
+The Firebase version is a content cache revision, not the published App Store version.
+Reading versions makes no changes; unavailable Firebase access stops the release.
+Use `npm run content:publish -- --show` to read only the Firebase content version.
+
+The release script offers a TestFlight build. If accepted, it runs
+`scripts/testflight-release.sh`: check Firebase read access, wait for one successful
+iOS build, submit that exact build and wait for submission success, then merge a
+unique `version` into `tee-time-nexus/appConfig/publicContent` and verify it.
+Values look like `1.2.0-20261022T001500000Z-a1b2c3d4`; repeated releases remain unique.
+Other document fields are preserved. Failed/skipped builds or failed submissions
+do not publish a content version. Submission success is upload to App Store Connect,
+not Apple approval or public availability. The refresh affects all compatible
+installations, not just TestFlight testers.
+
+One-time local authentication uses Google Application Default Credentials (ADC):
+
+```sh
+gcloud auth application-default login
+gcloud auth application-default set-quota-project tee-time-nexus
+npm run content:publish -- --check
+```
+
+The Google Cloud CLI (`gcloud`) must be installed first. `firebase login` and EAS login
+are separate from ADC. Use an authorized Google account with Firestore document
+read/write permissions (for example, the `roles/datastore.user` role) and permission
+to use the quota project. The preflight only checks reads; a missing write permission
+will fail explicitly at publishing. CI should use workload identity/ADC instead of
+checked-in service-account keys. Never place credentials in app configuration or source.
+
+After publishing website changes and purging its cache, you can also run:
+
+```sh
+npm run content:publish -- 1.2.0
+```
+
+This sends a refresh without building the app. If publishing fails after submission,
+fix authentication/permissions and retry just this command, not the build.
+The existing `npm run testflight` command remains build/auto-submit only;
+automatic content publishing is wired to the release script's build option.
+
 ## Safety while testing
 
 Delivery is controlled by two parameters in `functions/.env` (git-ignored):

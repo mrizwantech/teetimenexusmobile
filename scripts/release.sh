@@ -10,7 +10,40 @@ set -euo pipefail
 #   ./scripts/release.sh 1.1.0
 # ==============================================================================
 
-VERSION="${1:-1.1.0}"
+VERSION="${1:-}"
+if [ -n "$VERSION" ] && { [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [ "${#VERSION}" -gt 24 ]; }; then
+  echo "Error: Provide a release version such as 1.2.0 (at most 24 characters)."
+  exit 1
+fi
+
+echo "Current versions"
+node -e '
+const fs = require("node:fs");
+const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
+const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+console.log("  Local app version:     " + app.expo.version);
+console.log("  Local package version: " + pkg.version);
+if (app.expo.version !== pkg.version) {
+  console.warn("Warning: Local versions differ; the release will synchronize both to your chosen version.");
+}
+'
+if ! FIREBASE_VERSION=$(node functions/scripts/publish-content-version.mjs --show); then
+  echo "Error: Unable to read the Firebase content version. Fix Firebase access and retry."
+  exit 1
+fi
+echo "  Firebase content version: ${FIREBASE_VERSION}"
+echo "  (The content version is a cache revision, not the App Store version.)"
+
+if [ -z "$VERSION" ]; then
+  if ! read -p "Next app version to release (for example, 1.1.1): " -r VERSION; then
+    echo "Error: No release version provided. Run interactively or pass it with npm run release -- 1.1.1."
+    exit 1
+  fi
+fi
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [ "${#VERSION}" -gt 24 ]; then
+  echo "Error: Provide a release version such as 1.2.0 (at most 24 characters)."
+  exit 1
+fi
 RELEASE_BRANCH="release/v${VERSION}"
 DATE=$(date +'%Y-%m-%d')
 
@@ -117,6 +150,7 @@ fi
 
 # 6. Run validations (typecheck & tests)
 echo "Running typecheck and test suite..."
+npm run lint
 npx tsc --noEmit
 node --test tests/*.test.mjs
 
@@ -153,18 +187,18 @@ echo "=================================================="
 echo ""
 echo "You can build and submit directly to TestFlight using Expo EAS:"
 echo "  Option A (Recommended one-liner):"
-echo "    npx testflight"
-echo "    (or: npx eas-cli build --platform ios --profile production --auto-submit)"
+echo "    bash scripts/testflight-release.sh ${VERSION}"
+echo "    (waits for build and submission, then publishes the Firebase content version)"
 echo ""
 echo "  Option B (Two-step process):"
-echo "    1. Build IPA:   npx eas-cli build --platform ios --profile production"
-echo "    2. Submit IPA:  npx eas-cli submit --platform ios"
+echo "    1. Build IPA:   npx eas-cli@latest build --platform ios --profile production"
+echo "    2. Submit IPA:  npx eas-cli@latest submit --platform ios --wait"
+echo "    3. After success: npm run content:publish -- ${VERSION}"
 echo ""
 
 read -p "Do you want to trigger the TestFlight build now? (y/N): " -r trigger_build
 if [[ "$trigger_build" =~ ^[Yy]$ ]]; then
-  echo "Running EAS build with auto-submit to TestFlight..."
-  npx eas-cli build --platform ios --profile production --auto-submit
+  bash scripts/testflight-release.sh "$VERSION"
 fi
 
 echo ""
@@ -184,4 +218,3 @@ echo "   git pull origin main"
 echo "   git tag -a v${VERSION} -m 'Release v${VERSION}'"
 echo "   git push origin v${VERSION}"
 echo "=================================================="
-

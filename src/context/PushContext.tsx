@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Link, router, useRootNavigationState } from 'expo-router';
 
 import { useAuth } from './AuthContext';
+import { useBookingLeaveGuard } from './BookingLeaveContext';
 import { discardPushToken, syncDeviceRegistration } from '../notifications/device-registration';
 import { listenForPush, readPresentedPush, readPushState } from '../notifications/push';
 import { getNotificationRoute, NotificationRoute } from '../notifications/routes';
@@ -32,6 +33,7 @@ type PushContextValue = PushState & {
 const PushContext = createContext<PushContextValue | undefined>(undefined);
 
 export function PushProvider({ children }: PropsWithChildren) {
+  const leaveGuard = useBookingLeaveGuard();
   const { user, isLoading: authLoading } = useAuth();
   const historyOwner = authLoading ? null : user ? `user-${user.id}` : 'guest';
   const { history, historyLoading, historyError, unreadCount, saveMessage, saveMessages, markRead, retryHistory } = useNotificationHistory(historyOwner);
@@ -164,9 +166,9 @@ export function PushProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (navigation?.key && pendingOpen && routedOpenRef.current !== pendingOpen) {
       routedOpenRef.current = pendingOpen;
-      router.push(pendingOpen.route);
+      leaveGuard.request(pendingOpen.route, () => router.push(pendingOpen.route));
     }
-  }, [navigation?.key, pendingOpen]);
+  }, [navigation?.key, pendingOpen, leaveGuard]);
 
   // Link this phone's token to the signed-in account; retried whenever the push state refreshes.
   const userId = user?.id ?? null;
