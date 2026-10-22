@@ -134,7 +134,7 @@ test('invalid release versions stop before authentication or build commands', ()
   }
 });
 
-function simulateVersionSelection(t, { args = [], input = '', firebaseExit = '0' } = {}) {
+function simulateVersionSelection(t, { args = [], input = '', firebaseExit = '0', branch = 'main', dirty = '', pullExit = '0' } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'ttn-release-versions-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const log = join(directory, 'calls');
@@ -146,16 +146,23 @@ if [ "$1" = "functions/scripts/publish-content-version.mjs" ]; then
 fi
 exec "$REAL_NODE" "$@"
 `, { mode: 0o755 });
-  // Stop at the clean-worktree check; never allow this test to switch branches or build.
+  // Report an existing release branch to stop before changing files or building.
   writeFileSync(join(directory, 'git'), `#!/bin/sh
 printf 'git %s\\n' "$*" >> "$CALL_LOG"
-exit 1
+case "$1" in
+  branch) printf '%s\\n' "$TEST_BRANCH" ;;
+  status) printf '%s' "$TEST_DIRTY" ;;
+  pull) exit "$PULL_EXIT" ;;
+  show-ref) exit 0 ;;
+  *) echo "Unexpected Git operation" >&2; exit 1 ;;
+esac
 `, { mode: 0o755 });
   const result = spawnSync('bash', ['scripts/release.sh', ...args], {
     cwd: root, input, encoding: 'utf8',
     env: {
       ...process.env, PATH: `${directory}:${process.env.PATH}`,
       REAL_NODE: process.execPath, CALL_LOG: log, FIREBASE_EXIT: firebaseExit,
+      TEST_BRANCH: branch, TEST_DIRTY: dirty, PULL_EXIT: pullExit,
     },
   });
   return { ...result, calls: readFileSync(log, 'utf8') };
@@ -169,7 +176,7 @@ test('release shows local and Firebase versions and accepts an interactive next 
   assert.ok(result.stdout.includes(`Local package version: ${pkg.version}`));
   assert.match(result.stdout, /Firebase content version: "1\.0\.1"/);
   assert.match(result.stdout, /Preparing Release v1\.2\.3 for TestFlight/);
-  assert.match(result.calls, /^firebase --show\n/);
+  assert.match(result.calls, /git pull --ff-only origin main\nfirebase --show\n/);
   assert.doesNotMatch(result.calls, /git checkout|firebase 1\.2\.3/);
 });
 
@@ -184,10 +191,32 @@ for (const [name, options, message] of [
   ['invalid interactive input', { input: 'bad\n' }, /Provide a release version/],
   ['missing interactive input', {}, /No release version provided/],
 ]) {
-  test(`${name} stops release before git changes`, (t) => {
+  test(`${name} stops release before branch creation or file changes`, (t) => {
     const result = simulateVersionSelection(t, options);
     assert.notEqual(result.status, 0);
     assert.match(result.stdout, message);
-    assert.doesNotMatch(result.calls, /git /);
+    assert.doesNotMatch(result.calls, /git checkout|git show-ref|firebase \d/);
   });
 }
+
+for (const [name, options, message] of [
+  ['wrong starting branch', { branch: 'feature' }, /Releases must start on main/],
+  ['uncommitted files', { dirty: ' M app.json\n' }, /uncommitted or untracked files/],
+  ['untracked files', { dirty: '?? new-file.ts\n' }, /uncommitted or untracked files/],
+  ['failed or diverged pull', { pullExit: '1' }, /Could not fast-forward main/],
+]) {
+  test(`${name} prevents release preparation`, (t) => {
+    const result = simulateVersionSelection(t, options);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, message);
+    assert.doesNotMatch(result.calls, /firebase|git checkout|git show-ref/);
+    if (options.pullExit === undefined) assert.doesNotMatch(result.calls, /git pull/);
+  });
+}
+
+test('existing release branch stops instead of bypassing newly pulled main', (t) => {
+  const result = simulateVersionSelection(t, { args: ['1.2.3'] });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /already exists/);
+  assert.doesNotMatch(result.calls, /git checkout/);
+});

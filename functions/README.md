@@ -56,7 +56,13 @@ Purge any WordPress/CDN cache for the changed pages first; the app requests with
 
 ### Automatic refresh after a release
 
-`npm run release` displays the local app/package versions and the Firebase content
+`npm run release` requires a clean `main` branch (including no untracked files) and
+runs `git pull --ff-only origin main` before displaying versions. Merge your intended
+changes into main first. A wrong branch, dirty worktree, failed/diverged pull, or
+existing local release branch stops the script; it never silently continues with stale main
+or reuses a release branch.
+
+It displays the local app/package versions and the Firebase content
 version, then asks for the next app version (for example, `1.2.0`). You can also
 pass it directly with `npm run release -- 1.2.0`; current versions are still shown.
 The Firebase version is a content cache revision, not the published App Store version.
