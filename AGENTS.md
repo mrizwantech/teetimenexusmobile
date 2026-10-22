@@ -24,6 +24,7 @@ npx expo install --fix      # fix incompatible package versions
 Run lint and typecheck before declaring any task done.
 
 Release preparation (`npm run release -- <version>`) optionally runs `scripts/testflight-release.sh`, which waits for a successful iOS build and submission of that exact build before publishing a unique public content version to Firestore. Google ADC with Firestore read/write access is required separately from Firebase CLI login; no credentials belong in app source. Failed/skipped builds and failed submissions do not publish. Submission is not store approval. Retry a failed publish with `npm run content:publish -- <version>`. Run `node --test tests/release-content-version.test.mjs`; see `functions/README.md` for authentication setup.
+Release preparation requires clean main, including no untracked files, and a successful `git pull --ff-only origin main` before reading versions or creating the release branch. Merge changes into main first. Existing local release branches fail explicitly rather than being reused.
 
 ## Navigation & Routing
 

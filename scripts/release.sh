@@ -16,6 +16,22 @@ if [ -n "$VERSION" ] && { [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [ "$
   exit 1
 fi
 
+CURRENT_BRANCH=$(git branch --show-current)
+if [ "$CURRENT_BRANCH" != "main" ]; then
+  echo "Error: Releases must start on main. Commit your changes and merge them into main, then switch to main and retry."
+  exit 1
+fi
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Error: Working directory has uncommitted or untracked files. Please commit or stash them first."
+  git status --short
+  exit 1
+fi
+echo "Pulling latest main from origin..."
+if ! git pull --ff-only origin main; then
+  echo "Error: Could not fast-forward main. Resolve the Git/network issue before releasing."
+  exit 1
+fi
+
 echo "Current versions"
 node -e '
 const fs = require("node:fs");
@@ -51,29 +67,10 @@ echo "=================================================="
 echo " Preparing Release v${VERSION} for TestFlight"
 echo "=================================================="
 
-# 1. Check working directory status
-if ! git diff --quiet || ! git diff --staged --quiet; then
-  echo "Error: Working directory has uncommitted changes. Please commit or stash them first."
-  git status --short
-  exit 1
-fi
-
-CURRENT_BRANCH=$(git branch --show-current)
-echo "Current branch: ${CURRENT_BRANCH}"
-
-# 2. Ensure we start from an updated main branch or allow branch creation
-if [ "$CURRENT_BRANCH" != "main" ]; then
-  read -p "You are on '${CURRENT_BRANCH}', not 'main'. Do you want to switch to 'main' first? (y/N): " -r confirm_main
-  if [[ "$confirm_main" =~ ^[Yy]$ ]]; then
-    git checkout main
-    git pull origin main || true
-  fi
-fi
-
 # 3. Create or switch to release branch
 if git show-ref --quiet --heads "${RELEASE_BRANCH}"; then
-  echo "Branch '${RELEASE_BRANCH}' already exists. Switching to it..."
-  git checkout "${RELEASE_BRANCH}"
+  echo "Error: Branch '${RELEASE_BRANCH}' already exists. Choose a new release version or handle that branch explicitly."
+  exit 1
 else
   echo "Creating and switching to release branch '${RELEASE_BRANCH}'..."
   git checkout -b "${RELEASE_BRANCH}"
