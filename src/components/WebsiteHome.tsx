@@ -9,12 +9,17 @@ import { HeroCarousel } from './HeroCarousel';
 import { HomePanels } from './HomePanels';
 import { PrimaryButton } from './PrimaryButton';
 import { SectionCard } from './SectionCard';
+import { usePublicContentUpdate } from './usePublicContentUpdate';
 
 export function WebsiteHome() {
   const [content, setContent] = useState<HomeContent | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const requestIdRef = useRef(0);
+  usePublicContentUpdate<HomeContent>('home', (nextContent) => {
+    setContent(nextContent);
+    setError('');
+  });
 
   const loadContent = useCallback((forceRefresh = false) => {
     const requestId = ++requestIdRef.current;

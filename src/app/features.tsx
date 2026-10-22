@@ -9,6 +9,7 @@ import { HomePanels } from '../components/HomePanels';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
+import { usePublicContentUpdate } from '../components/usePublicContentUpdate';
 import { colors, homeStyles } from '../theme';
 
 export default function FeaturesScreen() {
@@ -16,6 +17,10 @@ export default function FeaturesScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const requestIdRef = useRef(0);
+  usePublicContentUpdate<HomeContent>('home', (nextContent) => {
+    setContent(nextContent);
+    setError('');
+  });
 
   const loadContent = useCallback((forceRefresh = false) => {
     const requestId = ++requestIdRef.current;

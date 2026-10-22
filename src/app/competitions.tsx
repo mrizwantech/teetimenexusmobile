@@ -4,10 +4,11 @@ import { ActivityIndicator, Alert, Image, Pressable, Text, View } from 'react-na
 import * as WebBrowser from 'expo-web-browser';
 
 import { getCompetitions } from '../api/competitions';
-import type { Competition, CompetitionType } from '../api/competitions-content';
+import type { Competition, CompetitionsResponse, CompetitionType } from '../api/competitions-content';
 import { BrandMark } from '../components/BrandMark';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
+import { usePublicContentUpdate } from '../components/usePublicContentUpdate';
 import { SectionCard } from '../components/SectionCard';
 import { colors, competitionStyles as styles, homeStyles } from '../theme';
 
@@ -66,6 +67,10 @@ export default function CompetitionsScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const requestIdRef = useRef(0);
+  usePublicContentUpdate<CompetitionsResponse>('competitions', (result) => {
+    setItems(result.items);
+    setError('');
+  });
   const visibleItems = items.filter((item) => filter === 'all' || item.type === filter);
 
   const loadCompetitions = useCallback((forceRefresh = false) => {

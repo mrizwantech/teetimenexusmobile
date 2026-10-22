@@ -1,24 +1,24 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { router } from 'expo-router';
 
 import { BrandMark } from './BrandMark';
 import { ScreenHeader } from './Screen';
 import { colors } from '../theme';
+import { usePush } from '../context/PushContext';
+import { notificationBadge } from '../notifications/history';
 
-type HomeHeaderProps = {
-    hasNotifications?: boolean;
-    onNotificationsPress?: () => void;
-};
-
-export function HomeHeader({ hasNotifications = true, onNotificationsPress }: HomeHeaderProps) {
+export function HomeHeader() {
+    const { unreadCount } = usePush();
+    const badge = notificationBadge(unreadCount);
     return (
         <ScreenHeader>
             <BrandMark />
             <Pressable
-                accessibilityLabel={hasNotifications ? 'Notifications available' : 'Notifications'}
+                accessibilityLabel={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
                 accessibilityRole="button"
                 hitSlop={8}
-                onPress={onNotificationsPress}
+                onPress={() => router.push('/notifications')}
                 style={styles.button}
             >
                 <View>
@@ -30,8 +30,12 @@ export function HomeHeader({ hasNotifications = true, onNotificationsPress }: Ho
                             strokeLinecap="round"
                             strokeLinejoin="round"
                         />
-                        {hasNotifications ? <Circle cx="20" cy="4" r="3" fill="#EF4444" stroke={colors.bg} strokeWidth="1.5" /> : null}
                     </Svg>
+                    {unreadCount > 0 ? (
+                        <View pointerEvents="none" style={[styles.badge, badge ? styles.countBadge : styles.dot]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                            {badge ? <Text style={styles.badgeText}>{badge}</Text> : null}
+                        </View>
+                    ) : null}
                 </View>
             </Pressable>
         </ScreenHeader>
@@ -39,5 +43,9 @@ export function HomeHeader({ hasNotifications = true, onNotificationsPress }: Ho
 }
 
 const styles = StyleSheet.create({
-    button: { alignItems: 'center', justifyContent: 'center', padding: 6 },
+    button: { alignItems: 'center', justifyContent: 'center', padding: 10, minHeight: 44, minWidth: 44 },
+    badge: { position: 'absolute', top: -6, right: -8, backgroundColor: '#EF4444', borderColor: colors.bg, borderWidth: 2 },
+    dot: { width: 10, height: 10, borderRadius: 5, top: -2, right: -2 },
+    countBadge: { minWidth: 24, minHeight: 24, borderRadius: 16, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+    badgeText: { color: colors.heading, fontSize: 14, lineHeight: 18, fontWeight: '800' },
 });

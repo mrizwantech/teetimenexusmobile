@@ -39,6 +39,12 @@
 
 ---
 
+## Mobile website checkout layout
+
+- At phone widths, the website checkout shows each item's line total once instead of repeating its unit price beside it. Quantity, savings, membership details, subtotal, and final total remain visible. Item details wrap without horizontal overflow; the website header/menu and desktop checkout are unchanged.
+- Deploy the theme's `style.css` to the active `golf-simulator-theme` and clear website/CDN caches. The app renders this website checkout, so no native rebuild is required for this CSS fix.
+- In the theme directory, run `php tests/mobile-checkout-layout.php`. Verify discounted and full-price items, multiple quantities, and the payment form on a phone before release.
+
 ## Android release code optimization
 
 - Release builds enable R8 minification/obfuscation and resource shrinking through `expo-build-properties` in `app.json`. The `with-android-release-optimization` config plugin selects `proguard-android-optimize.txt` without replacing library/application keep rules. Debug builds are unchanged.

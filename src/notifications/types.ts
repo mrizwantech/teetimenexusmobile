@@ -8,6 +8,8 @@ export type PushState = {
 };
 
 export type PushMessage = {
+  id?: string;
+  sentAt?: number;
   title?: string;
   body?: string;
   route?: unknown;
@@ -15,6 +17,6 @@ export type PushMessage = {
 
 export type PushListeners = {
   onMessage: (message: PushMessage) => void;
-  onOpen: (message: PushMessage) => void;
+  onOpen: (message: PushMessage) => boolean | void;
   onTokenRefresh: () => void;
 };

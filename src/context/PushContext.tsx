@@ -5,9 +5,12 @@ import { Link, router, useRootNavigationState } from 'expo-router';
 
 import { useAuth } from './AuthContext';
 import { discardPushToken, syncDeviceRegistration } from '../notifications/device-registration';
-import { listenForPush, readPushState } from '../notifications/push';
+import { listenForPush, readPresentedPush, readPushState } from '../notifications/push';
 import { getNotificationRoute, NotificationRoute } from '../notifications/routes';
 import { PushMessage, PushState } from '../notifications/types';
+import { useNotificationHistory } from '../notifications/useNotificationHistory';
+import type { NotificationEntry } from '../notifications/history';
+import { backgroundHistoryError, registerBackgroundHistory } from '../notifications/background';
 import { colors, spacing } from '../theme';
 
 type PushContextValue = PushState & {
@@ -18,12 +21,21 @@ type PushContextValue = PushState & {
   introReady: boolean;
   showIntro: boolean;
   dismissIntro: () => Promise<void>;
+  history: NotificationEntry[];
+  historyLoading: boolean;
+  historyError: string;
+  unreadCount: number;
+  markRead: (id?: string) => void;
+  retryHistory: () => void;
 };
 
 const PushContext = createContext<PushContextValue | undefined>(undefined);
 
 export function PushProvider({ children }: PropsWithChildren) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const historyOwner = authLoading ? null : user ? `user-${user.id}` : 'guest';
+  const { history, historyLoading, historyError, unreadCount, saveMessage, saveMessages, markRead, retryHistory } = useNotificationHistory(historyOwner);
+  const [historySyncError, setHistorySyncError] = useState('');
   const [state, setState] = useState<PushState>({ permission: 'not-determined', token: null });
   const [registrationError, setRegistrationError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -31,11 +43,34 @@ export function PushProvider({ children }: PropsWithChildren) {
   const [listenerError, setListenerError] = useState('');
   const [listenerAttempt, setListenerAttempt] = useState(0);
   const [pendingOpen, setPendingOpen] = useState<{ route: NotificationRoute } | null>(null);
+  const routedOpenRef = useRef<typeof pendingOpen>(null);
   const [introDismissed, setIntroDismissed] = useState<boolean | null>(null);
   const [introError, setIntroError] = useState('');
   const navigation = useRootNavigationState();
   const activeRef = useRef(false);
   const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!historyOwner) return;
+    const owner = historyOwner;
+    let cancelled = false;
+    async function collectPresented() {
+      try {
+        const messages = await readPresentedPush(owner);
+        if (!cancelled) {
+          saveMessages(messages);
+          setHistorySyncError('');
+        }
+      } catch (err) {
+        if (!cancelled) setHistorySyncError(err instanceof Error ? err.message : 'Unable to load delivered notifications.');
+      }
+    }
+    void collectPresented();
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void collectPresented();
+    });
+    return () => { cancelled = true; subscription.remove(); };
+  }, [historyOwner, saveMessages, listenerAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,20 +124,23 @@ export function PushProvider({ children }: PropsWithChildren) {
   }, [refresh]);
 
   useEffect(() => {
+    if (authLoading) return;
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
     const handleOpen = (message: PushMessage) => {
-      if (!cancelled) {
-        const route = getNotificationRoute(message.route);
-        if (message.route !== undefined && !route) console.warn('Ignored an unsupported push notification route.');
-        setPendingOpen({ route: route ?? '/' });
-      }
+      if (cancelled) return false;
+      saveMessage(message, true);
+      const route = getNotificationRoute(message.route);
+      if (message.route !== undefined && !route) console.warn('Ignored an unsupported push notification route.');
+      setPendingOpen({ route: route ?? '/' });
+      return true;
     };
     listenForPush({
       onOpen: handleOpen,
       onTokenRefresh: () => { if (!cancelled) void refresh(); },
       onMessage: (message) => {
         if (cancelled) return;
+        saveMessage(message);
         Alert.alert(message.title || 'Tee Time Nexus', message.body || 'You have a new notification.', [
           { text: 'Dismiss', style: 'cancel' },
           { text: 'Open', onPress: () => handleOpen(message) },
@@ -121,10 +159,13 @@ export function PushProvider({ children }: PropsWithChildren) {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [refresh, listenerAttempt]);
+  }, [refresh, listenerAttempt, authLoading, saveMessage]);
 
   useEffect(() => {
-    if (navigation?.key && pendingOpen) router.push(pendingOpen.route);
+    if (navigation?.key && pendingOpen && routedOpenRef.current !== pendingOpen) {
+      routedOpenRef.current = pendingOpen;
+      router.push(pendingOpen.route);
+    }
   }, [navigation?.key, pendingOpen]);
 
   // Link this phone's token to the signed-in account; retried whenever the push state refreshes.
@@ -174,7 +215,12 @@ export function PushProvider({ children }: PropsWithChildren) {
   const showIntro = introDismissed === false && !loading && !error && !listenerError && state.permission === 'not-determined';
 
   return (
-    <PushContext.Provider value={{ ...state, loading, error: error || listenerError || introError, registrationError, refresh: refreshConnection, introReady: introDismissed !== null, showIntro, dismissIntro }}>
+    <PushContext.Provider value={{
+      ...state, loading, error: error || listenerError || introError, registrationError, refresh: refreshConnection,
+      introReady: introDismissed !== null, showIntro, dismissIntro,
+      history, historyLoading, historyError: historyError || historySyncError || backgroundHistoryError, unreadCount, markRead,
+      retryHistory: () => { registerBackgroundHistory(); retryHistory(); setListenerAttempt((attempt) => attempt + 1); },
+    }}>
       {children}
       {error || listenerError || introError ? (
         <View style={{ padding: spacing.sm, backgroundColor: colors.surface }}>
