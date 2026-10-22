@@ -4,6 +4,23 @@ import test from 'node:test';
 
 const sourceRoot = new URL('../src/', import.meta.url);
 
+test('booking start times use three equal columns without shrinking or truncating labels', () => {
+  const booking = readFileSync(new URL('../src/app/book.tsx', import.meta.url), 'utf8');
+  const theme = readFileSync(new URL('../src/theme.ts', import.meta.url), 'utf8');
+  assert.match(booking, /onLayout=\{\(event\) => setTimeGridWidth\(event\.nativeEvent\.layout\.width\)\}/);
+  assert.match(booking, /Math\.floor\(\(timeGridWidth - 20\) \/ 3\)/);
+  assert.match(theme, /optionsWrap: \{[^}]*gap: 10/);
+  assert.match(booking, /width, paddingHorizontal: 4, minHeight: 44/);
+  assert.match(booking, /textAlign: 'center'/);
+  const pill = booking.slice(booking.indexOf('function Pill'));
+  assert.doesNotMatch(pill, /numberOfLines|adjustsFontSizeToFit|allowFontScaling/);
+  for (const available of [224, 280, 300, 340, 500]) {
+    const width = Math.floor((available - 20) / 3);
+    assert.ok(width * 3 + 20 <= available, `three pills must fit within ${available} points`);
+    assert.ok(width * 4 + 30 > available, `a fourth pill must wrap at ${available} points`);
+  }
+});
+
 test('booking setup uses two text-only cards with the requested labels and descriptions', () => {
   const booking = readFileSync(new URL('../src/app/book.tsx', import.meta.url), 'utf8');
   const card = readFileSync(new URL('../src/components/BayTypeCard.tsx', import.meta.url), 'utf8');

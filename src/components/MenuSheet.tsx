@@ -7,6 +7,7 @@ import { BrandMark } from '../components/BrandMark';
 import { NavigationIcon } from '../components/NavigationIcon';
 import { getMenuItems } from '../navigation/menu';
 import { useAuth } from '../context/AuthContext';
+import { useBookingLeaveGuard } from '../context/BookingLeaveContext';
 import { colors, radii, spacing } from '../theme';
 
 type MenuItem = ReturnType<typeof getMenuItems>[number];
@@ -20,6 +21,7 @@ export function MenuSheet({ visible, bottomOffset, onClose, onNavigate }: {
 }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const leaveGuard = useBookingLeaveGuard();
   const [gridWidth, setGridWidth] = useState(0);
   const [sheetHeight, setSheetHeight] = useState(0);
   const [progress] = useState(() => new Animated.Value(0));
@@ -39,9 +41,11 @@ export function MenuSheet({ visible, bottomOffset, onClose, onNavigate }: {
   }, [visible, sheetHeight, progress]);
 
   function openItem(item: MenuItem) {
-    onClose();
-    onNavigate?.();
-    router.navigate(item.path);
+    leaveGuard.request(item.path, () => {
+      onClose();
+      onNavigate?.();
+      router.navigate(item.path);
+    });
   }
 
   return (

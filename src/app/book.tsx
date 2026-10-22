@@ -1,6 +1,7 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { useIsFocused, usePreventRemove } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, BackHandler, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Bay, getAvailability, getBays, getBookingOptions, getBookingQuote, getFreeHoursBalance, TimeSlot } from '../api/booking';
 import { BookingOptions, BookingQuote, FreeHoursBalance, isBookingDateAllowed } from '../api/booking-rules';
@@ -15,7 +16,9 @@ import { BookingPolicyLink } from '../components/BookingPolicyLink';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { Screen, ScreenHeader } from '../components/Screen';
 import { SectionCard } from '../components/SectionCard';
+import { usePublicContentUpdate } from '../components/usePublicContentUpdate';
 import { useAuth } from '../context/AuthContext';
+import { useBookingLeaveGuard } from '../context/BookingLeaveContext';
 import { bookingStyles as styles } from '../theme';
 
 type BayType = 'right-handed' | 'left-handed';
@@ -35,9 +38,14 @@ function isBayVisibleForType(bay: Bay, bayType: BayType): boolean {
 
 export default function BookScreen() {
   const { user } = useAuth();
+  const navigation = useNavigation();
+  const leaveGuard = useBookingLeaveGuard();
+  const { register } = leaveGuard;
+  const isFocused = useIsFocused();
   const scrollRef = useRef<ScrollView>(null);
   const optionsRequestId = useRef(0);
   const [bays, setBays] = useState<Bay[]>([]);
+  usePublicContentUpdate<Bay[]>('bays', setBays);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loadError, setLoadError] = useState('');
   const [bookingOptions, setBookingOptions] = useState<BookingOptions | null>(null);
@@ -51,11 +59,41 @@ export default function BookScreen() {
   const [duration, setDuration] = useState<number | null>(null);
   const [players, setPlayers] = useState<number | null>(null);
   const [time, setTime] = useState<string | null>(null);
+  const [timeGridWidth, setTimeGridWidth] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [freeHours, setFreeHours] = useState<FreeHoursBalance | null>(null);
   const [quote, setQuote] = useState<{ key: string; value?: BookingQuote; error?: string } | null>(null);
+
+  useEffect(() => {
+    if (!user || !bayType) return;
+    return register('/book', () => {
+      setBayType(null);
+      setBayKey(null);
+      setDate(null);
+      setDuration(null);
+      setPlayers(null);
+      setTime(null);
+      setBookedTimes([]);
+      setQuote(null);
+      setCurrentStep(0);
+    });
+  }, [user, bayType, register]);
+
+  useFocusEffect(useCallback(() => {
+    if (!user || !bayType) return;
+    const back = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (navigation.canGoBack()) return false;
+      leaveGuard.request(null, () => BackHandler.exitApp());
+      return true;
+    });
+    return () => back.remove();
+  }, [user, bayType, leaveGuard, navigation]));
+
+  usePreventRemove(Boolean(isFocused && user && bayType), ({ data }) => {
+    leaveGuard.request(null, () => navigation.dispatch(data.action));
+  });
 
   const loadBookingOptions = useCallback(async () => {
     if (!user) return;
@@ -63,23 +101,29 @@ export default function BookScreen() {
     setLoadingOptions(true);
     setLoadError('');
     setBookingOptions(null);
-    try {
-      const [bayList, options] = await Promise.all([getBays(), getBookingOptions()]);
-      if (requestId !== optionsRequestId.current) return;
-      setBays(bayList);
-      setTimeSlots(options.slots);
-      setBookingOptions(options);
-      setDate((previous) => previous && isBookingDateAllowed(formatDate(previous), options) ? previous : null);
-      setCalendarMonth((previous) => {
-        const month = formatDate(previous).slice(0, 7);
-        if (month >= options.min_booking_date.slice(0, 7) && month <= options.max_booking_date.slice(0, 7)) return previous;
-        const [year, monthNumber] = options.min_booking_date.split('-').map(Number);
-        return new Date(year, monthNumber - 1, 1);
-      });
-    } catch (error) {
-      if (requestId === optionsRequestId.current) setLoadError(error instanceof Error ? error.message : 'Unable to load booking options. Please try again.');
-    } finally {
-      if (requestId === optionsRequestId.current) setLoadingOptions(false);
+    const results = await Promise.allSettled([
+      getBays().then((bayList) => {
+        if (requestId === optionsRequestId.current) setBays(bayList);
+      }),
+      getBookingOptions().then((options) => {
+        if (requestId !== optionsRequestId.current) return;
+        setTimeSlots(options.slots);
+        setBookingOptions(options);
+        setDate((previous) => previous && isBookingDateAllowed(formatDate(previous), options) ? previous : null);
+        setCalendarMonth((previous) => {
+          const month = formatDate(previous).slice(0, 7);
+          if (month >= options.min_booking_date.slice(0, 7) && month <= options.max_booking_date.slice(0, 7)) return previous;
+          const [year, monthNumber] = options.min_booking_date.split('-').map(Number);
+          return new Date(year, monthNumber - 1, 1);
+        });
+      }),
+    ]);
+    if (requestId === optionsRequestId.current) {
+      const errors = results.flatMap((result) => result.status === 'rejected'
+        ? [result.reason instanceof Error ? result.reason.message : 'Unable to load booking options. Please try again.']
+        : []);
+      setLoadError(errors.join('\n'));
+      setLoadingOptions(false);
     }
   }, [user]);
 
@@ -318,7 +362,7 @@ export default function BookScreen() {
         {loadError ? <PrimaryButton label="Retry booking options" onPress={() => void loadBookingOptions()} /> : null}
         {loadingOptions ? <Text style={styles.hint}>Loading booking options...</Text> : null}
 
-        {bookingOptions && !loadingOptions ? <SectionCard>
+        {currentStep <= 1 || (bookingOptions && !loadingOptions && !loadError) ? <SectionCard>
           {currentStep === 0 ? (
             <>
               <Text style={styles.setupHeading}>Select a bay that matches your swing</Text>
@@ -363,7 +407,7 @@ export default function BookScreen() {
             </>
           ) : null}
 
-          {currentStep === 2 ? (
+          {currentStep === 2 && bookingOptions ? (
             <>
               <Text style={styles.sectionHeading}>Choose a date</Text>
               <Text style={styles.hint}>You can book up to {bookingOptions.booking_window_days} days ahead.</Text>
@@ -423,11 +467,12 @@ export default function BookScreen() {
           {currentStep === 5 ? (
             <>
               <Text style={styles.sectionHeading}>Choose a start time</Text>
-              <View style={styles.optionsWrap}>
+              <View style={styles.optionsWrap} onLayout={(event) => setTimeGridWidth(event.nativeEvent.layout.width)}>
                 {timeSlots.map((slot, index) => (
                   <Pill
                     key={slot.label}
                     label={slot.label}
+                    width={timeGridWidth > 0 ? Math.max(1, Math.floor((timeGridWidth - 20) / 3)) : undefined}
                     selected={time === slot.label}
                     disabled={!isTimeSlotAvailable(index)}
                     onPress={() => {
@@ -474,16 +519,16 @@ export default function BookScreen() {
   );
 }
 
-function Pill({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
+function Pill({ label, selected, disabled, onPress, width }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void; width?: number }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={[styles.option, selected && styles.selected, disabled && styles.optionDisabled]}
+      style={[styles.option, width !== undefined && { width, paddingHorizontal: 4, minHeight: 44, justifyContent: 'center' }, selected && styles.selected, disabled && styles.optionDisabled]}
     >
-      <Text style={[styles.optionText, selected && styles.selectedText, disabled && styles.optionTextDisabled]}>{label}</Text>
+      <Text style={[styles.optionText, width !== undefined && { textAlign: 'center' }, selected && styles.selectedText, disabled && styles.optionTextDisabled]}>{label}</Text>
     </Pressable>
   );
 }

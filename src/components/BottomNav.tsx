@@ -7,9 +7,11 @@ import { bottomNavStyles as styles } from '../theme';
 import { NavigationIcon } from './NavigationIcon';
 import { primaryNavigation } from '../navigation/menu';
 import { MenuSheet } from './MenuSheet';
+import { useBookingLeaveGuard } from '../context/BookingLeaveContext';
 
 export function BottomNav({ onNavigate }: { onNavigate?: () => void } = {}) {
   const router = useRouter();
+  const leaveGuard = useBookingLeaveGuard();
   const pathname = usePathname();
   const [menuRoute, setMenuRoute] = useState<string | null>(null);
   const menuOpen = menuRoute === pathname;
@@ -33,9 +35,11 @@ export function BottomNav({ onNavigate }: { onNavigate?: () => void } = {}) {
       setMenuRoute((route) => route === pathname ? null : pathname);
       return;
     }
-    setMenuRoute(null);
-    onNavigate?.();
-    router.navigate(path);
+    leaveGuard.request(path, () => {
+      setMenuRoute(null);
+      onNavigate?.();
+      router.navigate(path);
+    });
   }
 
   return (

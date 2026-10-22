@@ -1,15 +1,62 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useIsFocused, usePreventRemove } from 'expo-router/react-navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, BackHandler, Pressable, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { CHECKOUT_SIGNATURE_END, CHECKOUT_SIGNATURE_START, checkoutSignatureScript } from '../api/checkout-signature';
 import { checkoutStyles as styles, colors } from '../theme';
+import { useBookingLeaveGuard } from '../context/BookingLeaveContext';
 
 export default function CheckoutScreen() {
     const { url, bay, date, time, duration, players, managementBookingId } = useLocalSearchParams<{ url: string; bay?: string; date?: string; time?: string; duration?: string; players?: string; managementBookingId?: string }>();
     const [error, setError] = useState('');
     const [signing, setSigning] = useState(false);
+    const [checkoutComplete, setCheckoutComplete] = useState(false);
+    const navigation = useNavigation();
+    const leaveGuard = useBookingLeaveGuard();
+    const { register } = leaveGuard;
+    const isFocused = useIsFocused();
+    const bookingCheckout = Boolean((bay && date) || managementBookingId);
+    const completed = useRef(false);
+    const unregisterGuard = useRef<(() => void) | null>(null);
+
+    useEffect(() => {
+        if (!bookingCheckout || completed.current) return;
+        const unregister = register('/checkout', () => {});
+        unregisterGuard.current = unregister;
+        return () => {
+            unregister();
+            if (unregisterGuard.current === unregister) unregisterGuard.current = null;
+        };
+    }, [bookingCheckout, register]);
+
+    useFocusEffect(useCallback(() => {
+        if (!bookingCheckout || completed.current) return;
+        const back = BackHandler.addEventListener('hardwareBackPress', () => {
+            if (navigation.canGoBack()) return false;
+            leaveGuard.request(null, () => BackHandler.exitApp());
+            return true;
+        });
+        return () => back.remove();
+    }, [bookingCheckout, leaveGuard, navigation]));
+
+    usePreventRemove(isFocused && bookingCheckout && !checkoutComplete, ({ data }) => {
+        leaveGuard.request(null, () => navigation.dispatch(data.action));
+    });
+
+    function finishCheckout(proceed: () => void) {
+        if (completed.current) return;
+        completed.current = true;
+        setCheckoutComplete(true);
+        unregisterGuard.current?.();
+        unregisterGuard.current = null;
+        proceed();
+    }
+
+    function closeCheckout() {
+        leaveGuard.request(null, () => router.back());
+    }
 
     function handleNavigation(url: string) {
         if (managementBookingId && /[?&]booking_change_failed=1(?:&|$)/.test(url)) {
@@ -17,7 +64,7 @@ export default function CheckoutScreen() {
             return;
         }
         if (managementBookingId && /[?&]booking_updated=1(?:&|$)/.test(url)) {
-            router.replace({ pathname: '/manage-reservation', params: { bookingId: managementBookingId } });
+            finishCheckout(() => router.replace({ pathname: '/manage-reservation', params: { bookingId: managementBookingId } }));
             return;
         }
         if (/[?&]booking_failed=1(?:&|$)/i.test(url)) {
@@ -32,13 +79,13 @@ export default function CheckoutScreen() {
             return;
         }
         if (/[?&](success|payment_status)=(success|paid|complete)/i.test(url) || /[?&]booking=confirmed/i.test(url) || /\/order-received\//i.test(url)) {
-            router.replace({ pathname: '/confirmation', params: { bay, date, time, duration, players } });
+            finishCheckout(() => router.replace({ pathname: '/confirmation', params: { bay, date, time, duration, players } }));
         }
     }
 
     if (error) {
         return <View style={styles.center}><Text accessibilityRole="alert" style={styles.error}>{error}</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={styles.back}>Back</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={closeCheckout}><Text style={styles.back}>Back</Text></Pressable>
         </View>;
     }
 
@@ -47,7 +94,7 @@ export default function CheckoutScreen() {
     return (
         <View style={styles.checkoutScreen}>
             <View style={styles.checkoutHeader}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Close checkout" onPress={() => router.back()}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Close checkout" onPress={closeCheckout}>
                     <Text style={styles.back}>‹</Text>
                 </Pressable>
                 <Text style={styles.checkoutTitle}>Secure Checkout</Text>
