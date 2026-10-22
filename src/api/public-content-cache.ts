@@ -29,6 +29,5 @@ const store: ContentCacheStore = Platform.OS === 'web' ? {
   },
 };
 
-export const PUBLIC_CONTENT_CACHE_MAX_AGE_MS = 5 * 60 * 1000;
-
-export const getCachedPublicContent = createContentCache(store);
+// Public content stays cached until Firebase publishes a new content version (see public-content-refresh.ts).
+export const publicContentCache = createContentCache(store);

@@ -108,8 +108,19 @@ test('competitions supports optional filters and defaults the combined destinati
   assert.match(competitions, /setFilter\(type === 'league' \|\| type === 'tournament' \? type : 'all'\)/);
 });
 test('booking policies remain available to booking screens but are omitted from the menu', () => {
-  assert.equal(bookingPolicyUrl, 'https://teetimenexus.com/book-a-bay/#ttn-terms-open');
+  assert.equal(bookingPolicyUrl, 'https://teetimenexus.com/refund_cancellation/');
   assert.equal(getMenuItems().some((item) => item.path === bookingPolicyUrl), false);
+});
+
+test('booking policy opens the published page directly across booking surfaces', () => {
+  const link = readFileSync(new URL('../src/components/BookingPolicyLink.tsx', import.meta.url), 'utf8');
+  assert.match(link, /WebBrowser\.openBrowserAsync\(bookingPolicyUrl\)/);
+  assert.match(link, /Opens the full cancellation and refund policy on our website\./);
+  assert.doesNotMatch(link, /Tap Terms and Conditions|website booking page/);
+  for (const file of ['src/app/book.tsx', 'src/components/BookingDetails.tsx', 'src/app/manage-reservation.tsx']) {
+    const source = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    assert.match(source, /<BookingPolicyLink\s*\/>/, `${file} uses the shared policy link`);
+  }
 });
 
 test('Home and Profile use native routes without restoring the old link list', () => {

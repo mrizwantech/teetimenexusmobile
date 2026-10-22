@@ -1,6 +1,7 @@
 import { apiRequest } from './client';
 import { isRecord } from './home-content';
-import { getCachedPublicContent, PUBLIC_CONTENT_CACHE_MAX_AGE_MS } from './public-content-cache';
+import { publicContentCache } from './public-content-cache';
+import { createMembershipStatusCache } from './membership-status-cache';
 import { MembershipRecord, membershipDisplayName, parseCurrentMembership, parseMembershipManagementResult } from './membership-rules';
 export type { MembershipRecord } from './membership-rules';
 
@@ -35,14 +36,13 @@ function parseMembershipPackages(value: unknown): MembershipPackage[] {
     return value.map((packageInfo) => ({ ...packageInfo, title: membershipDisplayName(packageInfo.title) }));
 }
 
+const loadMembershipPackages = publicContentCache.define('membership-packages', {
+    request: () => apiRequest<unknown>('/wp-json/ttn/v1/membership/packages', { cache: 'no-store' }),
+    parse: parseMembershipPackages,
+});
+
 export function getMembershipPackages(forceRefresh = false): Promise<MembershipPackage[]> {
-    return getCachedPublicContent({
-        key: 'membership-packages',
-        maxAgeMs: PUBLIC_CONTENT_CACHE_MAX_AGE_MS,
-        request: () => apiRequest<unknown>('/wp-json/ttn/v1/membership/packages'),
-        parse: parseMembershipPackages,
-        forceRefresh,
-    });
+    return loadMembershipPackages(forceRefresh);
 }
 
 export async function getCurrentMembership(): Promise<MembershipRecord | null> {
@@ -50,6 +50,8 @@ export async function getCurrentMembership(): Promise<MembershipRecord | null> {
     const value = await apiRequest<unknown>('/wp-json/ttn/v1/membership/current', { cache: 'no-store' });
     return parseCurrentMembership(value === undefined ? null : value);
 }
+
+export const browsingMembershipStatus = createMembershipStatusCache(getCurrentMembership);
 
 export async function manageMembership(action: 'change' | 'cancel' | 'undo', membership: MembershipRecord, packageSlug?: string) {
     if (!membership.revision || !membership.can_manage) {

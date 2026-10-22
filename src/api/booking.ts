@@ -1,6 +1,6 @@
 import { apiRequest } from './client';
 import { isRecord } from './home-content';
-import { getCachedPublicContent, PUBLIC_CONTENT_CACHE_MAX_AGE_MS } from './public-content-cache';
+import { publicContentCache } from './public-content-cache';
 import { parseBookingOptions, parseBookingQuote, parseFreeHoursBalance } from './booking-rules';
 
 export type Bay = {
@@ -44,24 +44,22 @@ function parseTimeSlots(value: unknown): TimeSlot[] {
     return value;
 }
 
+const loadBays = publicContentCache.define('bays', {
+    request: () => apiRequest<unknown>('/wp-json/ttn/v1/bays', { cache: 'no-store' }),
+    parse: parseBays,
+});
+
 export function getBays(forceRefresh = false): Promise<Bay[]> {
-    return getCachedPublicContent({
-        key: 'bays',
-        maxAgeMs: PUBLIC_CONTENT_CACHE_MAX_AGE_MS,
-        request: () => apiRequest<unknown>('/wp-json/ttn/v1/bays'),
-        parse: parseBays,
-        forceRefresh,
-    });
+    return loadBays(forceRefresh);
 }
 
+const loadTimeSlots = publicContentCache.define('time-slots', {
+    request: () => apiRequest<unknown>('/wp-json/ttn/v1/time-slots', { cache: 'no-store' }),
+    parse: parseTimeSlots,
+});
+
 export function getTimeSlots(forceRefresh = false): Promise<TimeSlot[]> {
-    return getCachedPublicContent({
-        key: 'time-slots',
-        maxAgeMs: PUBLIC_CONTENT_CACHE_MAX_AGE_MS,
-        request: () => apiRequest<unknown>('/wp-json/ttn/v1/time-slots'),
-        parse: parseTimeSlots,
-        forceRefresh,
-    });
+    return loadTimeSlots(forceRefresh);
 }
 
 export async function getBookingOptions() {

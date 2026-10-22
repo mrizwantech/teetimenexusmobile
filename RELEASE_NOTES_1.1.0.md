@@ -35,8 +35,27 @@
 
 ### 🎨 Typography, Layout & Styling
 - Readability improvements with high-contrast text (`#F5F5F5`), 17pt font sizing with 26pt line height, and responsive card padding.
+- The Home slider shows one slide across the available content width on tablet layouts (600 points or wider), instead of multiple narrow panels. Phones and narrow split-screen layouts retain the next-slide preview. Swipe and pagination remain available in portrait and landscape.
 
 ---
+
+## Mobile website checkout layout
+
+- At phone widths, the website checkout shows each item's line total once instead of repeating its unit price beside it. Quantity, savings, membership details, subtotal, and final total remain visible. Item details wrap without horizontal overflow; the website header/menu and desktop checkout are unchanged.
+- Deploy the theme's `style.css` to the active `golf-simulator-theme` and clear website/CDN caches. The app renders this website checkout, so no native rebuild is required for this CSS fix.
+- In the theme directory, run `php tests/mobile-checkout-layout.php`. Verify discounted and full-price items, multiple quantities, and the payment form on a phone before release.
+
+## Android release code optimization
+
+- Release builds enable R8 minification/obfuscation and resource shrinking through `expo-build-properties` in `app.json`. The `with-android-release-optimization` config plugin selects `proguard-android-optimize.txt` without replacing library/application keep rules. Debug builds are unchanged.
+- The Kisi Android bridge explicitly includes its Luch 0.4 beacon-scanning dependency from a group-restricted JitPack repository. The vendored ST2U AAR does not declare it; R8 otherwise reports missing `aga.android.luch` classes used by reader proximity scanning.
+- For an existing native project, regenerate Android with `npx expo prebuild --platform android --no-install`. EAS generates Android automatically because the native directory is excluded from its archive.
+- Build a new signed production App Bundle with `npx eas-cli@latest build --platform android --profile production`. An OTA update cannot change DEX optimization.
+- Before publishing, test the optimized release on a physical Android device, especially Kisi/Bluetooth access, passkeys, notifications (foreground/background/quit), and checkout.
+- Inspect the downloaded bundle with `unzip -p app.aab BUNDLE-METADATA/com.android.tools/r8.json` and `unzip -l app.aab | grep -E 'r8.json|proguard.map|\.dex$'`. Retain the matching R8 mapping for crash deobfuscation; verify Play Console has the mapping after upload. If metadata is missing, inspect the build outputs before publishing.
+- Verify the rebuilt version's obfuscation, shrinking, and optimization scores in Play Console against the reported 25% threshold. Enabling R8 is not proof of a particular score; dependency keep rules affect the result. Avoid blanket keep rules or disabling warnings to work around release-build failures.
+- Local release-bundle validation passed with R8 metadata indicating 80.73% obfuscation, 80.31% optimization, and 80.86% shrinking eligibility (`100 - stats.no*Percentage`), all above 25%; the bundle also contains its ProGuard mapping. These are local metadata results, not confirmation from Play Console. The generated local project uses debug signing, so use the EAS production build for store submission and recheck that artifact.
+- Configuration regression tests: `node --test tests/android-release-optimization.test.mjs`.
 
 ## 2. Release Comparison (v1.0.0 vs v1.1.0)
 

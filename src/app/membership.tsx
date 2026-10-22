@@ -2,12 +2,13 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 
-import { getCurrentMembership, getMembershipPackages, manageMembership, MembershipPackage, MembershipRecord, startGuestMembershipCheckout, startMembershipCheckout } from '../api/membership';
+import { browsingMembershipStatus, getMembershipPackages, manageMembership, MembershipPackage, MembershipRecord, startGuestMembershipCheckout, startMembershipCheckout } from '../api/membership';
 import { getContactEmailStatus } from '../api/contact-email';
 import { BrandMark } from '../components/BrandMark';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PasswordRequirements } from '../components/PasswordRequirements';
 import { Screen, ScreenHeader } from '../components/Screen';
+import { usePublicContentUpdate } from '../components/usePublicContentUpdate';
 import { useAuth } from '../context/AuthContext';
 import { router, useFocusEffect } from 'expo-router';
 import { colors, homeStyles, membershipStyles as styles } from '../theme';
@@ -27,39 +28,50 @@ export default function MembershipScreen() {
     const [managing, setManaging] = useState(false);
     const [notice, setNotice] = useState('');
     const [retry, setRetry] = useState(0);
+    const handledRetry = useRef(0);
     const mutationInFlight = useRef(false);
+    usePublicContentUpdate<MembershipPackage[]>('membership-packages', setPackages);
     const currentIsPaid = membership?.status === 'active' && membership.payment_status === 'paid';
 
     useFocusEffect(useCallback(() => {
         let cancelled = false;
+        const forceRefresh = retry !== handledRetry.current;
+        handledRetry.current = retry;
         setLoading(true);
         setError('');
+        setMembership(null);
         (async () => {
-            try {
-                const [availablePackages, current] = await Promise.all([
-                    getMembershipPackages(retry > 0),
-                    user ? getCurrentMembership() : Promise.resolve(null),
-                ]);
-                if (!cancelled) {
-                    setPackages(availablePackages);
-                    setMembership(current);
-                }
-            } catch (err) {
-                if (!cancelled) setError(err instanceof Error ? err.message : 'Unable to load membership options. Please try again.');
-            } finally {
-                if (!cancelled) setLoading(false);
+            const results = await Promise.allSettled([
+                getMembershipPackages(forceRefresh).then((availablePackages) => {
+                    if (!cancelled) setPackages(availablePackages);
+                }),
+                (user ? browsingMembershipStatus.get(user, forceRefresh) : Promise.resolve(null)).then((current) => {
+                    if (!cancelled) setMembership(current);
+                }),
+            ]);
+            if (!cancelled) {
+                const errors = results.flatMap((result) => result.status === 'rejected'
+                    ? [result.reason instanceof Error ? result.reason.message : 'Unable to load membership options. Please try again.']
+                    : []);
+                setError(errors.join('\n'));
+                setLoading(false);
             }
         })();
         return () => { cancelled = true; };
     }, [user, retry]));
 
     async function performManagement(action: 'change' | 'cancel' | 'undo', packageInfo?: MembershipPackage) {
-        if (!membership || mutationInFlight.current) return;
+        if (!membership || !user || mutationInFlight.current) return;
         mutationInFlight.current = true;
         setManaging(true);
         setNotice('');
         try {
-            const result = await manageMembership(action, membership, packageInfo?.slug);
+            const current = await browsingMembershipStatus.get(user, true);
+            setMembership(current);
+            if (!current || current.revision !== membership.revision) {
+                throw new Error('Your membership has changed. Review the updated details before trying again.');
+            }
+            const result = await manageMembership(action, current, packageInfo?.slug);
             if ('bridge_url' in result) {
                 router.push({ pathname: '/checkout', params: { url: result.bridge_url } });
             } else {
@@ -69,6 +81,7 @@ export default function MembershipScreen() {
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Unable to update membership. Please refresh before trying again.');
         } finally {
+            browsingMembershipStatus.invalidate(user);
             mutationInFlight.current = false;
             setManaging(false);
         }
@@ -117,6 +130,14 @@ export default function MembershipScreen() {
         setCheckoutError('');
         setLoadingPackage(packageInfo.slug);
         try {
+            if (user) {
+                const current = await browsingMembershipStatus.get(user, true);
+                setMembership(current);
+                if (current?.status === 'active' && current.payment_status === 'paid') {
+                    Alert.alert('Membership updated', 'You already have an active membership. Review your current plan before choosing a change.');
+                    return;
+                }
+            }
             if (user && (await getContactEmailStatus()).required) {
                 Alert.alert('Verify your contact email',
                     'Add and verify a non-relay contact email in Profile before continuing. You can keep signing in with Apple.',
@@ -133,6 +154,7 @@ export default function MembershipScreen() {
                 });
             setSelectedPackage(null);
             setAccountPassword('');
+            if (user) browsingMembershipStatus.invalidate(user);
             router.push({ pathname: '/checkout', params: { url: result.bridge_url } });
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Unable to start checkout. Please try again.';
@@ -166,7 +188,7 @@ export default function MembershipScreen() {
             {notice ? <Text accessibilityLiveRegion="polite" style={styles.intro}>{notice}</Text> : null}
             {loading ? <ActivityIndicator color={colors.primary} size="large" /> : null}
             {error ? <View><Text accessibilityRole="alert" style={styles.error}>{error}</Text><PrimaryButton secondary label="REFRESH MEMBERSHIP" disabled={loading || managing} onPress={() => setRetry((value) => value + 1)} /></View> : null}
-            {!loading && packages.map((packageInfo) => {
+            {packages.map((packageInfo) => {
                 const hasDiscount = packageInfo.discount_price !== null && packageInfo.discount_price < packageInfo.price;
                 const price = hasDiscount ? packageInfo.discount_price : packageInfo.price;
                 return <View key={packageInfo.slug} style={[styles.card, packageInfo.featured && styles.featuredCard]}>
@@ -176,7 +198,7 @@ export default function MembershipScreen() {
                     <View style={styles.priceRow}><Text style={styles.price}>${price}</Text><Text style={styles.month}> {packageInfo.billing}</Text></View>
                     {hasDiscount ? <Text style={styles.regularPrice}>Regularly ${packageInfo.price}{packageInfo.billing}</Text> : null}
                     <View style={styles.features}>{packageInfo.features.map((feature) => <Text key={feature} style={styles.feature}>✓ {feature}</Text>)}</View>
-                    <PrimaryButton label={loadingPackage === packageInfo.slug || managing ? 'LOADING...' : currentIsPaid ? (membership.package_key?.toLowerCase() === packageInfo.slug ? 'CURRENT PLAN' : 'CHANGE PLAN') : 'CHOOSE MEMBERSHIP'} onPress={() => handleChoose(packageInfo)} disabled={Boolean(loadingPackage) || managing || Boolean(error) || Boolean(currentIsPaid && (!membership.can_manage || membership.scheduled_change || membership.package_key?.toLowerCase() === packageInfo.slug))} />
+                    <PrimaryButton label={loadingPackage === packageInfo.slug || managing ? 'LOADING...' : currentIsPaid ? (membership.package_key?.toLowerCase() === packageInfo.slug ? 'CURRENT PLAN' : 'CHANGE PLAN') : 'CHOOSE MEMBERSHIP'} onPress={() => handleChoose(packageInfo)} disabled={loading || Boolean(loadingPackage) || managing || Boolean(error) || Boolean(currentIsPaid && (!membership.can_manage || membership.scheduled_change || membership.package_key?.toLowerCase() === packageInfo.slug))} />
                 </View>;
             })}
             <Modal visible={selectedPackage !== null} transparent animationType="slide" onRequestClose={closeCheckout}>

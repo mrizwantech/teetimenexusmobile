@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { isActivePaidMembership, membershipDisplayName, parseCurrentMembership, parseMembershipManagementResult } from '../src/api/membership-rules.ts';
+import { createMembershipStatusCache, MEMBERSHIP_STATUS_CACHE_MS } from '../src/api/membership-status-cache.ts';
 
 const record = {
   package_name: 'ALBATROSS', package_key: 'ALBATROSS', price: '499', discount_price: '399',
@@ -10,6 +11,91 @@ const record = {
   scheduled_change: null,
 };
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('browsing membership expires at exactly five minutes and manual refresh bypasses it', async () => {
+  let now = 0;
+  let requests = 0;
+  const owner = {};
+  const cache = createMembershipStatusCache(async () => {
+    requests += 1;
+    return parseCurrentMembership(record);
+  }, () => now);
+  assert.equal(MEMBERSHIP_STATUS_CACHE_MS, 300_000);
+  await cache.get(owner);
+  now = 299_999;
+  await cache.get(owner);
+  assert.equal(requests, 1);
+  now = 300_000;
+  await cache.get(owner);
+  assert.equal(requests, 2);
+  await cache.get(owner, true);
+  assert.equal(requests, 3);
+  cache.invalidate(owner);
+  await cache.get(owner);
+  assert.equal(requests, 4);
+});
+
+test('browsing cache isolates login sessions, caches no-membership results and retries failures', async () => {
+  let requests = 0;
+  let fail = false;
+  const cache = createMembershipStatusCache(async () => {
+    requests += 1;
+    if (fail) throw new Error('offline');
+    return null;
+  });
+  const owner = {};
+  const newSession = {};
+  assert.equal(await cache.get(owner), null);
+  await cache.get(owner);
+  assert.equal(requests, 1);
+  await cache.get(newSession);
+  assert.equal(requests, 2);
+  fail = true;
+  await assert.rejects(cache.get(owner, true), /offline/);
+  await assert.rejects(cache.get(owner), /offline/);
+  assert.equal(requests, 4);
+  fail = false;
+  await cache.get(owner);
+  assert.equal(requests, 5);
+});
+
+test('in-flight reads are shared and an invalidated response cannot restore the cache', async () => {
+  const releases = [];
+  const cache = createMembershipStatusCache(() => new Promise((resolve) => releases.push(resolve)));
+  const owner = {};
+  const first = cache.get(owner);
+  assert.equal(cache.get(owner), first);
+  cache.invalidate(owner);
+  const second = cache.get(owner);
+  releases[1](null);
+  await second;
+  releases[0](parseCurrentMembership(record));
+  await first;
+  assert.equal(await cache.get(owner), null);
+  assert.equal(releases.length, 2);
+});
+
+test('browsing cache is bypassed before actions and invalidated for checkout and management', () => {
+  const source = read('src/app/membership.tsx');
+  assert.match(source, /browsingMembershipStatus\.get\(user, forceRefresh\)/);
+  assert.equal((source.match(/browsingMembershipStatus\.get\(user, true\)/g) ?? []).length, 2);
+  assert.equal((source.match(/browsingMembershipStatus\.invalidate\(user\)/g) ?? []).length, 2);
+  assert.match(source, /current\.revision !== membership\.revision/);
+});
+
+test('membership browsing keeps package cards visible while checking fresh account status', () => {
+  const source = read('src/app/membership.tsx');
+  assert.match(source, /Promise\.allSettled/);
+  assert.match(source, /getMembershipPackages\(forceRefresh\)\.then/);
+  assert.match(source, /retry !== handledRetry\.current/);
+  assert.match(source, /handledRetry\.current = retry/);
+  assert.doesNotMatch(source, /getMembershipPackages\(retry > 0\)/);
+  assert.match(source, /\{packages\.map/);
+  assert.doesNotMatch(source, /!loading && packages\.map/);
+  assert.match(source, /setMembership\(null\)/);
+  assert.match(source, /disabled=\{loading \|\| Boolean\(loadingPackage\)/);
+  assert.match(read('src/api/membership.ts'), /membership\/current', \{ cache: 'no-store' \}/);
+});
 
 test('Profile and Home show membership only for active paid members without fabricated labels', () => {
   assert.equal(isActivePaidMembership(null), false);
@@ -89,7 +175,7 @@ test('management requires a real updated record or HTTPS checkout, never a succe
   }
 });
 
-test('native controls refresh on focus, confirm changes and block duplicate requests; current state is uncached', () => {
+test('native controls check status on focus, confirm changes and block duplicate requests; status API is uncached', () => {
   const screen = read('src/app/membership.tsx');
   assert.match(screen, /useFocusEffect\(useCallback/);
   assert.doesNotMatch(screen, /getCurrentMembership\(\)\.catch/);

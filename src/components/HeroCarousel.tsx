@@ -4,13 +4,14 @@ import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 
 import { HomeSlide } from '../api/home-content';
+import { getHeroCardWidth } from './hero-carousel-layout';
 import { PrimaryButton } from './PrimaryButton';
 import { accountStyles as signupFormStyles, colors, homeStyles as styles, spacing } from '../theme';
 
 export function HeroCarousel({ slides }: { slides: HomeSlide[] }) {
     const { width: windowWidth } = useWindowDimensions();
     const [viewportWidth, setViewportWidth] = useState(Math.max(windowWidth - spacing.lg * 2, 1));
-    const cardWidth = Math.max(1, Math.min(420, viewportWidth - (slides.length > 1 ? 28 : 0)));
+    const cardWidth = getHeroCardWidth(viewportWidth, slides.length);
     const cardInterval = cardWidth + spacing.md;
     const scrollRef = useRef<ScrollView>(null);
     const currentIndexRef = useRef(0);

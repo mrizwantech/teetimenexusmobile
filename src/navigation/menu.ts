@@ -4,7 +4,7 @@ export const primaryNavigation = [
   { label: 'Menu', path: '/menu', icon: 'menu' },
 ] as const;
 
-export const bookingPolicyUrl = 'https://teetimenexus.com/book-a-bay/#ttn-terms-open';
+export const bookingPolicyUrl = 'https://teetimenexus.com/refund_cancellation/';
 
 const websiteNavigation = [
   { label: 'Home', path: '/', kind: 'app' },

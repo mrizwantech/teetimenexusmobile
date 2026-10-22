@@ -7,11 +7,52 @@ App ──JWT──▶ WordPress (/wp-json/ttn/v1/push/*) ──signed webhook�
                   booking paid / changed / cancelled ─┘                sendBookingReminders (every minute)
 ```
 
-- No FCM topics. Every message targets one WordPress user's registered devices (max 10 per user).
+- Booking/account messages never use FCM topics; each targets one WordPress user's registered devices (max 10 per user). The only topic is `public-content`, used for silent, non-personal content refresh signals (see below).
 - Notification types: `booking_confirmed`, `booking_rescheduled`, `booking_cancelled`, `booking_reminder_15m`, `admin_message`, `marketing`.
 - Android channels: `ttn-bookings` (high), `ttn-account`, `ttn-marketing` (opt-in only).
 - Preferences: `booking_updates` and `booking_reminders` default on, `marketing` defaults off. Admin messages to one customer always arrive.
 - Push is independent of Kisi door access and never carries access secrets.
+
+## On-device notification history
+
+The Home bell opens the app's Notifications screen. It has no badge when all saved
+notifications are read, a red dot for one unread notification, and a numbered red
+bubble for two or more (capped visually at `99+`). Opening an item or a push marks
+that item read; **Mark all as read** clears the unread count without deleting history.
+
+The app keeps the latest 100 notifications on that phone, separately for each
+signed-in account and guests. Foreground messages and tapped pushes are saved.
+Android also saves notification payloads through an entry-point background handler;
+data-only messages are not processed. On launch and foregrounding, notifications
+still in the system tray with usable delivery metadata are imported as well.
+Android notifications predating the handler without delivery IDs cannot be imported
+until tapped. Signing out clears the tray along with releasing the device
+token, so another account does not import the previous account's notifications.
+History survives app restarts, but is not a server inbox or a cross-device archive.
+Notifications dismissed while the app was closed before it could save them cannot
+be recovered (in particular on iOS, where background execution is not guaranteed).
+Foreground storage/import errors appear with a retry action; background storage
+failures are logged without notification contents. Rebuild/release the app so the
+new custom Expo Router entry point runs in production.
+
+Run `node --test tests/notification-history.test.mjs tests/notification-routes.test.mjs tests/push-notifications.test.mjs tests/typography.test.mjs`,
+lint and typecheck. On physical iOS and Android devices, verify foreground receipt,
+background/quit delivery and tapping, tray import on reopening, duplicate handling,
+restart persistence, unread badges, mark-all-read, and sign-out/account isolation.
+This app-only change does not require a Cloud Functions deployment.
+
+## Refreshing app content (public content cache)
+
+The app caches public website content (home, hours, competitions, bays, time slots, membership packages) until you publish a new content version. To make every app download fresh content:
+
+1. Firebase Console > Firestore Database > collection `appConfig` > document `publicContent` (create it the first time).
+2. Set field `version` to a new value: a whole number (`1`, `2`, ...) or a short token of letters/numbers/`. _ : -` such as `2026-11-01.1`. Changing other fields does nothing.
+
+`publicContentChanged` (Firestore trigger) then sends one silent data-only message `{type: "content_refresh", version}` to topic `public-content` (Android high priority; APNs `apns-push-type: background`, priority 5, `content-available`). It shows nothing on the device and is not added to notification history. It is sent regardless of `NOTIFY_MODE` because it carries no personal data. Invalid versions are logged and ignored.
+
+`publicContentVersion` (public `GET`, `Cache-Control: no-store`) returns `{"version": "<value>" | null}`. Apps call it on launch and when foregrounded, so phones that missed the silent push (iOS throttles background pushes; force-stopped Android apps receive nothing) still refresh. Apps keep showing cached content while refreshing, and keep it if the refresh fails.
+
+Purge any WordPress/CDN cache for the changed pages first; the app requests with `cache: 'no-store'`, but a CDN can still serve an old response.
 
 ## Safety while testing
 
@@ -60,12 +101,15 @@ define( 'TTN_NOTIFY_WEBHOOK_URL', 'https://…/wordpressEvents' );
 
 Then upload the bookings plugin (including `inc/class-ttn-push-notifications.php`) and purge the site cache.
 
+The deploy also creates `publicContentChanged` (Firestore trigger; Firebase may ask to enable Eventarc on the first deploy) and `publicContentVersion`. The app's default version URL is `https://us-east1-tee-time-nexus.cloudfunctions.net/publicContentVersion`; set `EXPO_PUBLIC_CONTENT_VERSION_URL` if the deploy prints a different URL. Content-refresh topic delivery requires the rebuilt app.
+
 ## Verify, in this order
 
 1. **One test device.** Sign in to the app on a physical phone as an allowlisted user and enable notifications (Settings → Manage Notifications). WordPress → Bookings Manager → **App Notifications** → send to that user's email. The result should say `Sent to 1 device(s)`. "Not on the Firebase test allowlist" means `TEST_WP_USER_IDS` needs the ID and a redeploy.
 2. **Booking events.** As the same user, book and pay → "Booking confirmed". Change the time → "Booking updated". Cancel → "Booking cancelled".
 3. **Reminder.** Book a slot starting 20–30 minutes from now; the reminder arrives 15 minutes before start (within about a minute). Bookings made less than 15 minutes ahead skip the reminder.
 4. **Preferences.** Turn off Booking updates in the app and repeat step 2: nothing arrives, while an admin message still does.
+5. **Content refresh.** `curl https://us-east1-tee-time-nexus.cloudfunctions.net/publicContentVersion` returns `{"version":null}` before the document exists. Change a website Hours line, purge the site cache, then set `appConfig/publicContent.version` to `1`: the open Hours screen updates within seconds with no visible notification, and the curl returns `{"version":"1"}`.
 
 Logs: `firebase functions:log` (tokens, secrets and message bodies are never logged). Failed WordPress deliveries are retried for about an hour and then reported on the App Notifications page and in the PHP error log.
 

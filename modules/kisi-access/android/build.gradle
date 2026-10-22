@@ -8,10 +8,15 @@ version = '0.1.0'
 
 repositories {
   maven { url uri("$projectDir/vendor") }
+  maven {
+    url 'https://jitpack.io'
+    content { includeGroup 'com.github.agap' }
+  }
 }
 
 dependencies {
   implementation 'de.kisi:st2u:0.16'
+  implementation 'com.github.agap:luch:0.4'
   implementation 'at.favre.lib:hkdf:1.1.0'
   implementation 'com.github.weliem:blessed-android:2.5.0'
   implementation 'io.reactivex.rxjava3:rxjava:3.1.8'

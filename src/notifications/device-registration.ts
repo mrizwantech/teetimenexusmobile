@@ -1,6 +1,7 @@
 import { registerPushDevice, unregisterPushDevice } from '../api/push';
 import { DeviceRegistration, needsRegistration } from '../api/push-rules';
-import { releasePushToken } from './push';
+import { subscribeToContentRefresh } from './content-refresh';
+import { clearPresentedPush, releasePushToken } from './push';
 
 // The device token is linked to the signed-in account on the server so notifications are personal.
 let registered: DeviceRegistration | null = null;
@@ -27,6 +28,12 @@ export async function syncDeviceRegistration(userId: number | null | undefined, 
 export async function discardPushToken() {
   registered = null;
   await withTimeout(releasePushToken(), 5000);
+  resubscribeContentRefresh();
+}
+
+// Deleting the FCM token drops topic subscriptions; keep receiving public content updates.
+function resubscribeContentRefresh() {
+  subscribeToContentRefresh().catch((error: unknown) => console.warn('Unable to subscribe to content updates.', error));
 }
 
 /** Called before sign-out so this phone stops receiving the account's notifications. */
@@ -36,4 +43,6 @@ export async function releasePushDevice() {
   if (current) await withTimeout(unregisterPushDevice(current.token), 5000).catch(() => undefined);
   // Deleting the token guarantees the old account can't reach this phone even if the server call failed.
   await withTimeout(releasePushToken(), 5000).catch(() => undefined);
+  resubscribeContentRefresh();
+  await withTimeout(clearPresentedPush(), 5000);
 }

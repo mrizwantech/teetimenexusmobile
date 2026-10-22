@@ -22,7 +22,7 @@ export function BookingPolicyLink() {
   return (
     <Pressable accessibilityRole="link" disabled={opening} onPress={() => void openPolicy()} style={styles.link}>
       <Text style={styles.title}>{opening ? 'Opening...' : 'Booking, Cancellation & Refund Policy'}</Text>
-      <Text style={styles.hint}>Opens the website booking page. Tap Terms and Conditions to read the full policy.</Text>
+      <Text style={styles.hint}>Opens the full cancellation and refund policy on our website.</Text>
     </Pressable>
   );
 }

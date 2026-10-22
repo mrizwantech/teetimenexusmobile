@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Linking, Platform, Switch, Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { Linking, Platform, Pressable, Switch, Text, View } from 'react-native';
+import { Link, router } from 'expo-router';
 
 import { getPushPreferences, PushPreferences, setPushPreferences } from '../api/push';
 import { BrandMark } from '../components/BrandMark';
@@ -80,7 +80,10 @@ function NotificationPreferences() {
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
-  const { permission, token, notice, loading, error, registrationError, refresh } = usePush();
+  const {
+    permission, token, notice, loading, error, registrationError, refresh,
+    history, historyLoading, historyError, unreadCount, markRead, retryHistory,
+  } = usePush();
   const [settingsError, setSettingsError] = useState('');
   const enabled = permission === 'authorized' || permission === 'provisional';
 
@@ -97,6 +100,42 @@ export default function NotificationsScreen() {
     <Screen>
       <ScreenHeader><BrandMark /><Link href={user ? '/settings' : '/account'}><Text style={{ color: colors.primary }}>{user ? 'Back to settings' : 'Back to account'}</Text></Link></ScreenHeader>
       <Text accessibilityRole="header" style={[styles.title, { fontSize: 22, lineHeight: 28 }]}>Notifications</Text>
+      <SectionCard>
+        <Text accessibilityRole="header" style={styles.cardTitle}>Notification history</Text>
+        <Text style={styles.body}>Saved on this phone. Open a notification to mark it as read.</Text>
+        {historyLoading ? <Text style={styles.body}>Loading notifications...</Text> : null}
+        {historyError ? (
+          <>
+            <Text accessibilityRole="alert" style={styles.error}>{historyError}</Text>
+            <PrimaryButton secondary label="TRY AGAIN" onPress={retryHistory} />
+          </>
+        ) : null}
+        {!historyLoading && !historyError && history.length === 0 ? (
+          <Text style={styles.body}>No notifications yet. New notifications received on this phone will appear here.</Text>
+        ) : null}
+        {unreadCount > 0 ? <PrimaryButton small secondary label="MARK ALL AS READ" onPress={() => markRead()} /> : null}
+        {history.map((entry) => (
+          <Pressable
+            key={entry.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${entry.read ? '' : 'Unread. '}${entry.title}. ${entry.body}. ${new Date(entry.receivedAt).toLocaleString()}`}
+            onPress={() => { markRead(entry.id); router.push(entry.route); }}
+            style={({ pressed }) => ({
+              gap: spacing.sm, padding: spacing.md, borderRadius: 14,
+              borderWidth: 1, borderColor: entry.read ? colors.borderStrong : colors.primary,
+              backgroundColor: entry.read ? colors.surface : colors.surfaceSoft,
+              opacity: pressed ? 0.72 : 1,
+            })}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Text style={[styles.bookingTitle, { flex: 1 }]}>{entry.title}</Text>
+              {!entry.read ? <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '700' }}>Unread</Text> : null}
+            </View>
+            <Text style={styles.body}>{entry.body}</Text>
+            <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 20 }}>{new Date(entry.receivedAt).toLocaleString()}</Text>
+          </Pressable>
+        ))}
+      </SectionCard>
       {!loading && (!enabled || notice || error || settingsError || (user && token && registrationError)) ? (
         <SectionCard accent>
           {notice ? <Text style={styles.body}>{notice}</Text> : null}
