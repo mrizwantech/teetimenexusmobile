@@ -78,6 +78,8 @@ Other document fields are preserved. Failed/skipped builds or failed submissions
 do not publish a content version. Submission success is upload to App Store Connect,
 not Apple approval or public availability. The refresh affects all compatible
 installations, not just TestFlight testers.
+The wrapper uses `npx --yes` so EAS CLI installation cannot block on a confirmation
+prompt hidden in the captured build JSON output.
 
 One-time local authentication uses Google Application Default Credentials (ADC):
 
