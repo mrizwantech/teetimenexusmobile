@@ -65,7 +65,7 @@ exec "$REAL_NODE" "$@"
 `, { mode: 0o755 });
   writeFileSync(join(directory, 'npx'), `#!/bin/sh
 printf 'eas %s\\n' "$*" >> "$CALL_LOG"
-if [ "$2" = "build" ]; then
+if [ "$3" = "build" ]; then
   printf '%s\\n' "$BUILD_JSON"
   exit "\${BUILD_EXIT:-0}"
 fi
@@ -90,8 +90,8 @@ test('release waits for the exact build and submission before publishing', (t) =
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.calls, [
     'firebase --check',
-    'eas eas-cli@latest build --platform ios --profile production --wait --json',
-    'eas eas-cli@latest submit --platform ios --profile production --id exact-build --wait',
+    'eas --yes eas-cli@latest build --platform ios --profile production --wait --json',
+    'eas --yes eas-cli@latest submit --platform ios --profile production --id exact-build --wait',
     'firebase 1.2.0',
   ]);
 });

@@ -12,7 +12,7 @@ BUILD_RESULT=$(mktemp)
 trap 'rm -f "$BUILD_RESULT"' EXIT
 
 echo "Building iOS release ${VERSION}; waiting for the completed build..."
-npx eas-cli@latest build --platform ios --profile production --wait --json > "$BUILD_RESULT"
+npx --yes eas-cli@latest build --platform ios --profile production --wait --json > "$BUILD_RESULT"
 BUILD_ID=$(node -e '
 const fs = require("node:fs");
 const builds = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
@@ -24,7 +24,7 @@ console.log(builds[0].id);
 ' "$BUILD_RESULT")
 
 echo "Submitting build ${BUILD_ID}; waiting for successful submission..."
-npx eas-cli@latest submit --platform ios --profile production --id "$BUILD_ID" --wait
+npx --yes eas-cli@latest submit --platform ios --profile production --id "$BUILD_ID" --wait
 
 echo "Build and submission succeeded. Refreshing public content for all compatible installations..."
 if ! node functions/scripts/publish-content-version.mjs "$VERSION"; then
