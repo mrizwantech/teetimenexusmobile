@@ -1,9 +1,13 @@
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { deleteAccount as apiDeleteAccount } from '../api/account-deletion';
 import { clearKisiCredentials } from '../../modules/kisi-access';
 import { releasePushDevice } from '../notifications/device-registration';
+import { writeNotificationHistory } from '../notifications/history-storage';
 
 import {
     AuthUser,
+    clearPasskeyEnrollmentPrompt,
+    clearTokens,
     fetchCurrentUser,
     getAccessToken,
     hasStoredSession,
@@ -24,6 +28,7 @@ type AuthContextValue = {
     loginWithApple: (identityToken: string, nonce: string, name?: string, givenName?: string, familyName?: string) => Promise<void>;
     register: (params: { name: string; email: string; password: string; phone?: string; smsOptIn?: boolean; promoOptIn?: boolean }) => Promise<boolean>;
     logout: () => Promise<void>;
+    deleteAccount: (password?: string) => Promise<{ localCleanupWarning?: string }>;
     refreshUser: () => Promise<void>;
 };
 
@@ -102,6 +107,32 @@ export function AuthProvider({ children }: PropsWithChildren) {
                     setUser(null);
                     setSignInSequence(0);
                 }
+            },
+            deleteAccount: async (password) => {
+                if (!user) throw new Error('You must be signed in to delete your account.');
+                await apiDeleteAccount(password);
+
+                const deviceCleanup = await Promise.allSettled([releasePushDevice()]);
+                const cleanup = await Promise.allSettled([
+                    clearKisiCredentials(),
+                    clearTokens(),
+                    clearPasskeyEnrollmentPrompt(user.id),
+                ]);
+                let localCleanupFailed = deviceCleanup.some((result) => result.status === 'rejected')
+                    || cleanup.some((result) => result.status === 'rejected');
+                try {
+                    writeNotificationHistory(`user-${user.id}`, '[]');
+                } catch {
+                    localCleanupFailed = true;
+                }
+
+                if (mountedRef.current) {
+                    setUser(null);
+                    setSignInSequence(0);
+                }
+                return localCleanupFailed
+                    ? { localCleanupWarning: 'Your account was deleted, but some data could not be cleared from this device.' }
+                    : {};
             },
             refreshUser: async () => {
                 const accessToken = await getAccessToken();

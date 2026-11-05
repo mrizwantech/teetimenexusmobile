@@ -37,6 +37,7 @@ type EventBase = { id: string; occurredAt: number };
 export type WordPressEvent = EventBase & (
   | { type: 'device.register'; userId: number; token: string; platform: DevicePlatform }
   | { type: 'device.unregister'; userId: number; token: string }
+  | { type: 'account.delete'; userId: number }
   | { type: 'preferences.get'; userId: number }
   | { type: 'preferences.set'; userId: number; preferences: Partial<Preferences> }
   | { type: BookingEventType; booking: BookingDetails }
@@ -79,6 +80,7 @@ export interface NotificationStore {
   releaseEvent(eventId: string): Promise<void>;
   registerDevice(userId: number, token: string, platform: DevicePlatform, now: number): Promise<void>;
   unregisterDevice(userId: number, token: string): Promise<void>;
+  deleteUser(userId: number, deletedAt: number): Promise<void>;
   listDevices(userId: number): Promise<DeviceRecord[]>;
   removeDevices(userId: number, deviceIds: string[]): Promise<void>;
   getPreferences(userId: number): Promise<Preferences>;

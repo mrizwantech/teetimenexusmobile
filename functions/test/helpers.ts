@@ -23,6 +23,7 @@ export class MemoryStore implements NotificationStore {
   owners = new Map<string, number>();
   preferences = new Map<number, Preferences>();
   bookings = new Map<number, BookingRecord>();
+  deletedUsers = new Set<number>();
 
   async claimEvent(eventId: string, _type: string, payloadHash: string, now: number): Promise<ClaimResult> {
     const row = this.events.get(eventId);
@@ -46,6 +47,7 @@ export class MemoryStore implements NotificationStore {
   }
 
   async registerDevice(userId: number, token: string, platform: DevicePlatform): Promise<void> {
+    if (this.deletedUsers.has(userId)) throw new Error('Cannot register a device for a deleted account.');
     const id = sha256Hex(token);
     const previous = this.owners.get(id);
     if (previous !== undefined && previous !== userId) this.devices.get(previous)?.delete(id);
@@ -59,6 +61,13 @@ export class MemoryStore implements NotificationStore {
     const id = sha256Hex(token);
     if (this.owners.get(id) === userId) this.owners.delete(id);
     this.devices.get(userId)?.delete(id);
+  }
+
+  async deleteUser(userId: number, _deletedAt: number): Promise<void> {
+    this.deletedUsers.add(userId);
+    await this.removeDevices(userId, [...(this.devices.get(userId)?.keys() ?? [])]);
+    this.devices.delete(userId);
+    this.preferences.delete(userId);
   }
 
   async listDevices(userId: number): Promise<DeviceRecord[]> {
@@ -77,6 +86,7 @@ export class MemoryStore implements NotificationStore {
   }
 
   async setPreferences(userId: number, preferences: Partial<Preferences>): Promise<Preferences> {
+    if (this.deletedUsers.has(userId)) throw new Error('Cannot update preferences for a deleted account.');
     const next = { ...(await this.getPreferences(userId)), ...preferences };
     this.preferences.set(userId, next);
     return next;

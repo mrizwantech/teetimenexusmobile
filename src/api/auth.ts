@@ -56,6 +56,38 @@ export async function loginWithApple(params: {
     return data;
 }
 
+export async function reauthenticateWithApple(params: {
+    identityToken: string;
+    nonce: string;
+    expectedUserId: number;
+}): Promise<void> {
+    const refreshed = await refreshAccessToken();
+    const accessToken = refreshed?.access_token ?? await getAccessToken();
+    if (!accessToken) throw new Error('Your session expired. Please sign in again.');
+
+    const response = await fetch(`${API_BASE_URL}/wp-json/ttn/v1/auth/apple/reauthenticate`, {
+        method: 'POST',
+        headers: {
+            Authorization: 'Bearer '.concat(accessToken),
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            identity_token: params.identityToken,
+            nonce: params.nonce,
+        }).toString(),
+    });
+
+    if (!response.ok) {
+        throw new Error(await parseErrorMessage(response));
+    }
+
+    const data = await parseJsonResponse<LoginResponse>(response);
+    if (data.user.id !== params.expectedUserId) {
+        throw new Error('Apple verification did not match the signed-in account.');
+    }
+    await storeTokens(data);
+}
+
 async function parseErrorMessage(response: Response): Promise<string> {
     try {
         const body = await response.json();
@@ -117,6 +149,27 @@ export async function loginWithPasskey(options?: { immediate?: boolean }): Promi
         }
         throw error;
     }
+}
+
+export async function reauthenticateWithPasskey(expectedUserId: number): Promise<void> {
+    const platform = passkeyPlatform();
+    async function request(path: string, body: unknown): Promise<unknown> {
+        const response = await fetch(`${API_BASE_URL}/wp-json/ttn/v1/auth/passkeys/login/${path}`, {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error(await parseErrorMessage(response));
+        return parseJsonResponse<unknown>(response);
+    }
+
+    const loginOptions = parsePasskeyLoginOptions(await request('options', { platform }));
+    const credential = await getNativePasskey(loginOptions.request);
+    const data = parsePasskeySession(await request('verify', { challenge_id: loginOptions.challengeId, credential }));
+    if (data.user.id !== expectedUserId) {
+        throw new Error('That passkey belongs to a different account. Try another verification method.');
+    }
+    await storeTokens(data);
 }
 
 export async function registerAccount(params: {
@@ -221,6 +274,10 @@ async function clearTokens(): Promise<void> {
 
 export async function getAccessToken(): Promise<string | null> {
     return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+}
+
+export async function clearPasskeyEnrollmentPrompt(userId: number): Promise<void> {
+    await SecureStore.deleteItemAsync(`ttn_passkey_prompt_${userId}`);
 }
 
 export async function hasStoredSession(): Promise<boolean> {

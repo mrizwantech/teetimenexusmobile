@@ -117,6 +117,24 @@ test('permanently invalid tokens are removed; temporary failures are kept', asyn
   assert.deepEqual((await store.listDevices(7)).map((device) => device.token), [TOKEN_B]);
 });
 
+test('account deletion removes all push devices and preferences for that WordPress user', async () => {
+  const { deps, store } = makeDeps();
+  await send(deps, 'device.register', { user_id: 7, token: TOKEN_A, platform: 'ios' });
+  await send(deps, 'device.register', { user_id: 7, token: TOKEN_B, platform: 'android' });
+  await send(deps, 'preferences.set', { user_id: 7, preferences: { marketing: true } });
+
+  const deleted = await send(deps, 'account.delete', { user_id: 7 });
+
+  assert.deepEqual(deleted.body.result, { deleted: true });
+  assert.deepEqual(await store.listDevices(7), []);
+  assert.equal(store.owners.size, 0, 'device ownership records are removed');
+  assert.deepEqual(await store.getPreferences(7), { bookingUpdates: true, bookingReminders: true, marketing: false });
+  assert.equal(store.deletedUsers.has(7), true);
+  assert.equal((await send(deps, 'device.register', { user_id: 7, token: TOKEN_A, platform: 'ios' })).status, 500);
+  assert.equal((await send(deps, 'preferences.set', { user_id: 7, preferences: { marketing: true } })).status, 500);
+  assert.deepEqual(await store.listDevices(7), []);
+});
+
 test('registration rejects tokens FCM no longer accepts so the app fetches a fresh one', async () => {
   const { deps, sender, store } = makeDeps();
   await send(deps, 'device.register', { user_id: 7, token: TOKEN_A, platform: 'ios' });

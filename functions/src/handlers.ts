@@ -102,6 +102,9 @@ export async function handleEvent(event: WordPressEvent, deps: Deps): Promise<Re
     case 'device.unregister':
       await deps.store.unregisterDevice(event.userId, event.token);
       return { unregistered: true };
+    case 'account.delete':
+      await deps.store.deleteUser(event.userId, event.occurredAt);
+      return { deleted: true };
     case 'preferences.get':
       return { preferences: await deps.store.getPreferences(event.userId) };
     case 'preferences.set':

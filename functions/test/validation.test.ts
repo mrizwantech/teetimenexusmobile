@@ -41,6 +41,7 @@ test('parses every supported event type', () => {
   const cases: Array<[string, Record<string, unknown>]> = [
     ['device.register', { user_id: 7, token: TOKEN, platform: 'ios' }],
     ['device.unregister', { user_id: 7, token: TOKEN }],
+    ['account.delete', { user_id: 7 }],
     ['preferences.get', { user_id: 7 }],
     ['preferences.set', { user_id: 7, preferences: { marketing: true } }],
     ['booking.confirmed', { booking }],
@@ -82,6 +83,7 @@ test('rejects invalid or unsafe payloads', () => {
     envelope('message.user', { user_id: 7, title: 'Hi', body: 'Test', route: 'https://evil.example' }),
     envelope('message.user', { user_id: 7, title: 'x'.repeat(66), body: 'Test', route: '/' }),
     envelope('message.broadcast', { title: 'Hi', body: '', route: '/' }),
+    envelope('account.delete', { user_id: 0 }),
   ];
   for (const value of invalid) assert.equal(parseEvent(value).ok, false, JSON.stringify(value));
 });

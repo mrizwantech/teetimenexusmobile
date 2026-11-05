@@ -8,6 +8,7 @@ App ──JWT──▶ WordPress (/wp-json/ttn/v1/push/*) ──signed webhook�
 ```
 
 - Booking/account messages never use FCM topics; each targets one WordPress user's registered devices (max 10 per user). The only topic is `public-content`, used for silent, non-personal content refresh signals (see below).
+- Account deletion sends a signed `account.delete` event that removes the account's Firebase device tokens and notification preferences before WordPress deletes the user. A minimal deleted-user marker prevents delayed in-flight requests from restoring account data or devices. Deploy the bookings plugin, theme account-deletion route, and Firebase Functions together.
 - Notification types: `booking_confirmed`, `booking_rescheduled`, `booking_cancelled`, `booking_reminder_15m`, `admin_message`, `marketing`.
 - Android channels: `ttn-bookings` (high), `ttn-account`, `ttn-marketing` (opt-in only).
 - Preferences: `booking_updates` and `booking_reminders` default on, `marketing` defaults off. Admin messages to one customer always arrive.

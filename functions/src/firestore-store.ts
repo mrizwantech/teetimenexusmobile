@@ -111,8 +111,10 @@ export class FirestoreNotificationStore implements NotificationStore {
     const ownerRef = this.db.collection('deviceOwners').doc(deviceId);
     const userRef = this.userRef(userId);
     const deviceRef = userRef.collection('devices').doc(deviceId);
+    const deletedUserRef = this.db.collection('deletedUsers').doc(userDocId(userId));
     await this.db.runTransaction(async (tx) => {
-      const [owner, device] = await Promise.all([tx.get(ownerRef), tx.get(deviceRef)]);
+      const [deletedUser, owner, device] = await Promise.all([tx.get(deletedUserRef), tx.get(ownerRef), tx.get(deviceRef)]);
+      if (deletedUser.exists) throw new Error('Cannot register a device for a deleted account.');
       const previousOwner = owner.data()?.wpUserId;
       // A phone signed into a new account must stop receiving the previous account's notifications.
       if (typeof previousOwner === 'number' && previousOwner !== userId) {
@@ -143,6 +145,16 @@ export class FirestoreNotificationStore implements NotificationStore {
     });
   }
 
+  async deleteUser(userId: number, deletedAt: number): Promise<void> {
+    await this.db.collection('deletedUsers').doc(userDocId(userId)).set({
+      deletedAt: Timestamp.fromMillis(deletedAt),
+    });
+    const userRef = this.userRef(userId);
+    const devices = await userRef.collection('devices').get();
+    await this.removeDevices(userId, devices.docs.map((device) => device.id));
+    await userRef.delete();
+  }
+
   async listDevices(userId: number): Promise<DeviceRecord[]> {
     const snapshot = await this.userRef(userId).collection('devices').get();
     return snapshot.docs.flatMap((doc) => {
@@ -171,8 +183,10 @@ export class FirestoreNotificationStore implements NotificationStore {
 
   async setPreferences(userId: number, preferences: Partial<Preferences>, now: number): Promise<Preferences> {
     const ref = this.userRef(userId);
+    const deletedUserRef = this.db.collection('deletedUsers').doc(userDocId(userId));
     return this.db.runTransaction(async (tx) => {
-      const snapshot = await tx.get(ref);
+      const [deletedUser, snapshot] = await Promise.all([tx.get(deletedUserRef), tx.get(ref)]);
+      if (deletedUser.exists) throw new Error('Cannot update preferences for a deleted account.');
       const next = { ...readPreferences(snapshot.data()?.preferences), ...preferences };
       tx.set(ref, { wpUserId: userId, preferences: next, updatedAt: Timestamp.fromMillis(now) }, { merge: true });
       return next;

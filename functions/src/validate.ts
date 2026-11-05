@@ -129,6 +129,8 @@ export function parseEvent(value: unknown): ParseResult {
         return { ok: true, event: { ...base, type, userId: positiveId(data.user_id, 'user_id'), token: token(data.token), platform: platform(data.platform) } };
       case 'device.unregister':
         return { ok: true, event: { ...base, type, userId: positiveId(data.user_id, 'user_id'), token: token(data.token) } };
+      case 'account.delete':
+        return { ok: true, event: { ...base, type, userId: positiveId(data.user_id, 'user_id') } };
       case 'preferences.get':
         return { ok: true, event: { ...base, type, userId: positiveId(data.user_id, 'user_id') } };
       case 'preferences.set':
