@@ -4,7 +4,8 @@ import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as WebBrowser from 'expo-web-browser';
-import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ContentPanel, HomeContent, HomePanel } from '../api/home-content';
 import { colors, homeStyles, radii, spacing } from '../theme';
@@ -74,15 +75,17 @@ export function HomePanels({ content, columns = 1, mediaOnly = false }: { conten
       </View>
       {selectedMedia ? (
         <Modal animationType="slide" transparent onRequestClose={() => setSelectedMedia(null)}>
-          <View style={homeStyles.modalBackdrop}>
-            <View style={homeStyles.modalCard}>
-              <Text style={homeStyles.cardTitle}>{selectedMedia.title}</Text>
-              {selectedMedia.media_type === 'video'
-                ? <PanelVideo key={selectedMedia.media} uri={selectedMedia.media} />
-                : <PanelImage key={selectedMedia.media} panel={selectedMedia} />}
-              <PrimaryButton label="CLOSE MEDIA" onPress={() => setSelectedMedia(null)} />
-            </View>
-          </View>
+          <SafeAreaView style={homeStyles.modalBackdrop}>
+            <ScrollView contentContainerStyle={homeStyles.modalScrollContent}>
+              <View style={homeStyles.modalCard}>
+                <Text style={homeStyles.cardTitle}>{selectedMedia.title}</Text>
+                {selectedMedia.media_type === 'video'
+                  ? <PanelVideo key={selectedMedia.media} uri={selectedMedia.media} />
+                  : <PanelImage key={selectedMedia.media} panel={selectedMedia} />}
+                <PrimaryButton label="CLOSE MEDIA" onPress={() => setSelectedMedia(null)} />
+              </View>
+            </ScrollView>
+          </SafeAreaView>
         </Modal>
       ) : null}
     </>

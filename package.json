@@ -48,6 +48,7 @@
     "ios": "expo run:ios --device \"iPhone 18 Pro\"",
     "ios:device": "expo run:ios --device",
     "android:build": "expo run:android",
+    "android:verify-release": "node scripts/check-android-release.mjs",
     "ios:build": "expo run:ios --device \"iPhone 18 Pro\"",
     "web": "expo start --web",
     "lint": "expo lint",

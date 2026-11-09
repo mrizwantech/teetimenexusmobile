@@ -191,7 +191,8 @@ export function DoorAccess({ visible, bookingId, onClose }: DoorAccessProps) {
 
     return (
         <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-            <SafeAreaView style={styles.screen} edges={['top']}>
+            <View style={styles.screen}>
+            <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
                 <ScreenHeader>
                     <Pressable accessibilityRole="button" accessibilityLabel="Close door access" onPress={onClose} style={styles.closeButton}>
                         <Text style={styles.closeText}>‹</Text>
@@ -221,8 +222,9 @@ export function DoorAccess({ visible, bookingId, onClose }: DoorAccessProps) {
                     }} />
                     <Text style={styles.instruction}>Bluetooth and reader permissions are required. Access is limited to your member booking; this app does not open the door automatically.</Text>
                 </ScrollView>
-                <BottomNav onNavigate={onClose} />
             </SafeAreaView>
+                <BottomNav onNavigate={onClose} />
+            </View>
         </Modal>
     );
 }

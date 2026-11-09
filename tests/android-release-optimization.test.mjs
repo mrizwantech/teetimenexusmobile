@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import withAndroidReleaseOptimization from '../plugins/with-android-release-optimization.js';
+import { checkOptimization } from '../scripts/check-android-release.mjs';
 
 const app = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8')).expo;
 
@@ -44,4 +45,57 @@ test('Kisi beacon scanning packages its runtime dependency rather than suppressi
   assert.match(gradle, /content \{ includeGroup 'com\.github\.agap' \}/);
   const plugin = readFileSync(new URL('../plugins/with-android-release-optimization.js', import.meta.url), 'utf8');
   assert.doesNotMatch(plugin, /-dontwarn|-ignorewarnings/);
+});
+
+const releaseMetadata = {
+  options: {
+    isDebugModeEnabled: false,
+    isOptimizationsEnabled: true,
+    isShrinkingEnabled: true,
+    isObfuscationEnabled: true,
+  },
+  stats: {
+    noOptimizationPercentage: 19.69,
+    noShrinkingPercentage: 19.14,
+    noObfuscationPercentage: 19.27,
+  },
+};
+
+test('release verification uses R8 excluded-code percentages, not class-renaming counts', () => {
+  const scores = checkOptimization(releaseMetadata);
+  assert.equal(scores.optimization.toFixed(2), '80.31');
+  assert.equal(scores.shrinking.toFixed(2), '80.86');
+  assert.equal(scores.obfuscation.toFixed(2), '80.73');
+});
+
+test('each category enforces the exact 25% boundary', () => {
+  for (const [stat, category] of [
+    ['noOptimizationPercentage', 'optimization'],
+    ['noShrinkingPercentage', 'shrinking'],
+    ['noObfuscationPercentage', 'obfuscation'],
+  ]) {
+    const metadata = structuredClone(releaseMetadata);
+    metadata.stats[stat] = 75;
+    assert.equal(checkOptimization(metadata)[category], 25);
+    metadata.stats[stat] = 75.01;
+    assert.throws(() => checkOptimization(metadata), new RegExp(`${category}:.*below the 25%`));
+    metadata.stats[stat] = 99;
+    assert.throws(() => checkOptimization(metadata), /1\.00% is below/);
+    for (const value of [undefined, null, '19', NaN, Infinity, -1, 101]) {
+      metadata.stats[stat] = value;
+      assert.throws(() => checkOptimization(metadata), /Missing or invalid/);
+    }
+  }
+});
+
+test('missing metadata, debug builds, and disabled R8 phases cannot pass verification', () => {
+  for (const metadata of [undefined, null, {}, { options: {} }]) {
+    assert.throws(() => checkOptimization(metadata), /release-mode R8/);
+  }
+  for (const option of Object.keys(releaseMetadata.options)) {
+    const metadata = structuredClone(releaseMetadata);
+    metadata.options[option] = !metadata.options[option];
+    assert.throws(() => checkOptimization(metadata), /release-mode R8|disabled/);
+  }
+  assert.throws(() => checkOptimization({ options: releaseMetadata.options }), /Missing or invalid/);
 });

@@ -3,6 +3,7 @@ import { useIsFocused, usePreventRemove } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, Pressable, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CHECKOUT_SIGNATURE_END, CHECKOUT_SIGNATURE_START, checkoutSignatureScript } from '../api/checkout-signature';
 import { checkoutStyles as styles, colors } from '../theme';
@@ -84,15 +85,15 @@ export default function CheckoutScreen() {
     }
 
     if (error) {
-        return <View style={styles.center}><Text accessibilityRole="alert" style={styles.error}>{error}</Text>
+        return <SafeAreaView edges={['top', 'left', 'right']} style={styles.center}><Text accessibilityRole="alert" style={styles.error}>{error}</Text>
             <Pressable accessibilityRole="button" onPress={closeCheckout}><Text style={styles.back}>Back</Text></Pressable>
-        </View>;
+        </SafeAreaView>;
     }
 
-    if (!url) return <View style={styles.center}><Text style={styles.error}>Checkout URL is missing.</Text></View>;
+    if (!url) return <SafeAreaView edges={['top', 'left', 'right']} style={styles.center}><Text style={styles.error}>Checkout URL is missing.</Text></SafeAreaView>;
 
     return (
-        <View style={styles.checkoutScreen}>
+        <SafeAreaView edges={['top', 'left', 'right']} style={styles.checkoutScreen}>
             <View style={styles.checkoutHeader}>
                 <Pressable accessibilityRole="button" accessibilityLabel="Close checkout" onPress={closeCheckout}>
                     <Text style={styles.back}>‹</Text>
@@ -114,6 +115,6 @@ export default function CheckoutScreen() {
                 onError={() => setError('Checkout could not be loaded. Please try again.')}
                 onNavigationStateChange={(state) => handleNavigation(state.url)}
             />
-        </View>
+        </SafeAreaView>
     );
 }

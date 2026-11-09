@@ -261,10 +261,6 @@ export default function BookScreen() {
     selectionsComplete,
   ];
 
-  function scrollToLatestStep() {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
-  }
-
   function selectDate(nextDate: Date) {
     if (!bookingOptions || !isBookingDateAllowed(formatDate(nextDate), bookingOptions) || !isDaySlotAvailable(nextDate, bookingOptions.slots)) {
       Alert.alert('Date unavailable', 'No tee times are available for this date. Please choose another date.');
@@ -275,7 +271,6 @@ export default function BookScreen() {
     setPlayers(null);
     setTime(null);
     setCurrentStep(3);
-    scrollToLatestStep();
   }
 
   function handleBayTypeSelect(nextType: BayType) {
@@ -362,7 +357,7 @@ export default function BookScreen() {
         {loadError ? <PrimaryButton label="Retry booking options" onPress={() => void loadBookingOptions()} /> : null}
         {loadingOptions ? <Text style={styles.hint}>Loading booking options...</Text> : null}
 
-        {currentStep <= 1 || (bookingOptions && !loadingOptions && !loadError) ? <SectionCard>
+        {currentStep <= 1 || (bookingOptions && !loadingOptions && !loadError) ? <SectionCard key={`booking-step-${currentStep}`}>
           {currentStep === 0 ? (
             <>
               <Text style={styles.setupHeading}>Select a bay that matches your swing</Text>

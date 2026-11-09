@@ -1,9 +1,10 @@
 import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { bookingEndTime } from '../api/booking-rules';
 import { getCurrentMembership } from '../api/membership';
+import { getDirectionsOptions, getSavedDirectionsOption, saveDirectionsOption } from '../api/directions';
 
 import { openAppleCalendar, openGoogleCalendar } from './CalendarCard';
 import { BayCard } from './BayCard';
@@ -39,6 +40,7 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
     const [invitePhone, setInvitePhone] = useState('');
     const [doorAccessVisible, setDoorAccessVisible] = useState(false);
     const [isPaidMember, setIsPaidMember] = useState(false);
+    const openingDirections = useRef(false);
     const endsAt = bookingEndTime(date, time, duration);
     const [now, setNow] = useState(() => Date.now());
     const hasEnded = endsAt !== null && now >= endsAt;
@@ -99,8 +101,62 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
         Linking.openURL(`mailto:${inviteEmail.trim()}?subject=${subject}&body=${body}`);
     }
 
-    function openDirections() {
-        Linking.openURL('http://maps.apple.com/?q=Tee%20Time%20Nexus');
+    async function launchDirections(option: ReturnType<typeof getDirectionsOptions>[number]) {
+        if (openingDirections.current) return;
+        openingDirections.current = true;
+        try {
+            await Linking.openURL(option.url);
+        } catch (error: unknown) {
+            Alert.alert(`Unable to open ${option.label}`, error instanceof Error ? error.message : 'The selected maps app is unavailable.', [
+                { text: 'Choose another app', onPress: chooseDirectionsApp },
+                { text: 'Open in browser', onPress: () => {
+                    void Linking.openURL(option.webUrl).catch((cause: unknown) => {
+                        Alert.alert('Unable to open directions', cause instanceof Error ? cause.message : 'Please try again.');
+                    });
+                } },
+                { text: 'Cancel', style: 'cancel' },
+            ]);
+            return;
+        } finally {
+            openingDirections.current = false;
+        }
+        try {
+            await saveDirectionsOption(Platform.OS, option.label);
+        } catch (error: unknown) {
+            Alert.alert('Maps preference not saved', error instanceof Error ? error.message : 'Your maps app opened, but your choice could not be saved.');
+        }
+    }
+
+    function chooseDirectionsApp() {
+        Alert.alert('Directions', 'Choose a maps app. We will remember your choice on this device.', [
+            ...getDirectionsOptions(Platform.OS).map((option) => ({
+                text: option.label,
+                onPress: () => { void launchDirections(option); },
+            })),
+            { text: 'Cancel', style: 'cancel' },
+        ]);
+    }
+
+    async function openDirections() {
+        if (openingDirections.current) return;
+        openingDirections.current = true;
+        let option: Awaited<ReturnType<typeof getSavedDirectionsOption>>;
+        try {
+            option = await getSavedDirectionsOption(Platform.OS);
+        } catch (error: unknown) {
+            Alert.alert('Unable to load maps preference', error instanceof Error ? error.message : 'Please choose a maps app.', [
+                { text: 'Choose app', onPress: chooseDirectionsApp },
+                { text: 'Cancel', style: 'cancel' },
+            ]);
+            return;
+        } finally {
+            openingDirections.current = false;
+        }
+        if (option) {
+            await launchDirections(option);
+        } else {
+            chooseDirectionsApp();
+        }
     }
 
     return (
@@ -140,8 +196,11 @@ export function BookingDetails({ bookingId, bay, date, time, duration, players, 
                     { text: 'Cancel', style: 'cancel' },
                 ])} />
                 <ActionButton icon="players" label="Invite\nPlayers" onPress={invitePlayers} />
-                <ActionButton icon="directions" label="Directions" onPress={openDirections} />
+                <ActionButton icon="directions" label="Directions" onPress={() => { void openDirections(); }} />
             </View>
+            <Pressable accessibilityRole="button" onPress={chooseDirectionsApp}>
+                <Text style={styles.cancel}>Change maps app</Text>
+            </Pressable>
 
             <Modal visible={inviteVisible} transparent animationType="slide" onRequestClose={() => setInviteVisible(false)}>
                 <View style={styles.modalBackdrop}>

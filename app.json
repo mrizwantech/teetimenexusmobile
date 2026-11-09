@@ -89,7 +89,8 @@
         }
       ],
       "./plugins/with-firebase-notification-manifest",
-      "./plugins/with-android-release-optimization"
+      "./plugins/with-android-release-optimization",
+      "./plugins/with-android-adaptive-layout"
     ],
     "extra": {
       "kisi": {

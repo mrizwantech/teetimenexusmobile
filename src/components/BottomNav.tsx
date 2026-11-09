@@ -45,7 +45,7 @@ export function BottomNav({ onNavigate }: { onNavigate?: () => void } = {}) {
   return (
     <>
     <MenuSheet visible={menuOpen && navHeight > 0} bottomOffset={navHeight} onClose={() => setMenuRoute(null)} onNavigate={onNavigate} />
-    <SafeAreaView edges={['bottom']} style={styles.nav} onLayout={(event) => setNavHeight(event.nativeEvent.layout.height)}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.nav} onLayout={(event) => setNavHeight(event.nativeEvent.layout.height)}>
       {primaryNavigation.map((item) => {
         const active = item.path === '/menu' ? menuOpen : pathname === item.path;
         return (

@@ -49,7 +49,7 @@ export function MenuSheet({ visible, bottomOffset, onClose, onNavigate }: {
   }
 
   return (
-    <View pointerEvents={visible ? 'auto' : 'none'} accessibilityElementsHidden={!visible} importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'} style={[styles.overlay, { bottom: bottomOffset, paddingTop: insets.top + spacing.md }]}>
+    <View pointerEvents={visible ? 'auto' : 'none'} accessibilityElementsHidden={!visible} importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'} style={[styles.overlay, { bottom: bottomOffset, paddingTop: insets.top + spacing.md, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: progress }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close menu" onPress={onClose} style={StyleSheet.absoluteFill} />
       </Animated.View>
